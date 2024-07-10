@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "template-python-project-poetry"
+name = "dpongpy"
 packages = [
-    { include = "my_project" },
+    { include = "dpongpy" },
 ]
 version = "2.1.6"
 description = "A template for Python projects, using Poetry"
@@ -11,8 +11,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">= 3.9.0 < 4.0.0"
-scikit-learn = "^1.5.0"
-pandas = "^2.2.2"
+pygame = "^2.6.0"
 
 [tool.poetry.group.dev.dependencies]
 coverage = "^7.4.0"
@@ -26,11 +25,11 @@ test = "python -m unittest discover -v -s tests -p '*.py'"
 coverage = "coverage run -m unittest discover -v -s tests -p '*.py'"
 coverage-report = "coverage report -m"
 coverage-html = "coverage html"
-mypy = "mypy my_project tests"
-compile = "python -m compileall my_project tests"
+mypy = "mypy dpongpy tests"
+compile = "python -m compileall dpongpy tests"
 
 [tool.poetry.scripts]
-my_project = "my_project:main"
+dpongpy = "dpongpy:main"
 
 [build-system]
 requires = ["poetry-core"]

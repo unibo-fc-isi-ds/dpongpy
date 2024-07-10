@@ -1,0 +1,3 @@
+import dpongpy
+
+dpongpy.main()

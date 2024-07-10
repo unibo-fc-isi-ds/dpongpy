@@ -1,5 +1,5 @@
 import unittest
-from my_project import MyClass
+from dpongpy import MyClass
 
 
 class TestMyClass(unittest.TestCase):
