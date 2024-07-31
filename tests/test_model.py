@@ -19,15 +19,15 @@ class TestDirection(unittest.TestCase):
 
 class TestRectangle(unittest.TestCase):
     @staticmethod
-    def rect(min=None, position=None, size=(1, 1)):
+    def rect(tl=None, position=None, size=(1, 1)):
         size = Vector2(size)
-        if min is not None:
-            min = Vector2(min)
-            return Rectangle(min, min + size)
+        if tl is not None:
+            tl = Vector2(tl)
+            return Rectangle(tl, tl + size)
         if position is not None:
             position = Vector2(position)
             return Rectangle(position - size / 2, position + size / 2)
-        raise ValueError("min or center must be provided")
+        raise ValueError("tl or center must be provided")
     
     def indexes(self, rows = 3, cols = 3, include_center=True):
         for i in range(rows):
@@ -39,41 +39,41 @@ class TestRectangle(unittest.TestCase):
     def setUp(self) -> None:
         self.rectangles = dict()
         for i, j in self.indexes():
-            self.rectangles[(i, j)] = self.rect(min=(j, i))
+            self.rectangles[(i, j)] = self.rect(tl=(j, i))
         self.rectangles[(1, 1)] = self.rect(position=(1.5, 1.5), size=(2, 2))
-        self.box = self.rect(min=(0, 0), size=(3, 3))
-        self.other = self.rect(min=(4, 4))
+        self.box = self.rect(tl=(0, 0), size=(3, 3))
+        self.other = self.rect(tl=(4, 4))
 
     def all_rectangles(self):
         return list(self.rectangles.values()) + [self.box, self.other]
 
     def test_create_from_wrong_args(self):
         rect = Rectangle((0, 0), (10, -10))
-        self.assertEqual(rect.min, Vector2(0, -10))
-        self.assertEqual(rect.max, Vector2(10, 0))
+        self.assertEqual(rect.top_left, Vector2(0, -10))
+        self.assertEqual(rect.bottom_right, Vector2(10, 0))
 
     def test_properties(self):
         for i, j in self.indexes():
             with self.subTest(rect=f'in position {i}, {j}'):
                 rect = self.rectangles[(i, j)]
                 if i == 1 and j == 1:
-                    self.assertEqual(rect.min, Vector2(j - 0.5, i - 0.5))
-                    self.assertEqual(rect.max, Vector2(j + 1.5, i + 1.5))
+                    self.assertEqual(rect.top_left, Vector2(j - 0.5, i - 0.5))
+                    self.assertEqual(rect.bottom_right, Vector2(j + 1.5, i + 1.5))
                     self.assertEqual(rect.position, Vector2(j + 0.5, i + 0.5))
                     self.assertEqual(rect.size, Vector2(2, 2))
                 else:
-                    self.assertEqual(rect.min, Vector2(j, i))
-                    self.assertEqual(rect.max, Vector2(j + 1, i + 1))
+                    self.assertEqual(rect.top_left, Vector2(j, i))
+                    self.assertEqual(rect.bottom_right, Vector2(j + 1, i + 1))
                     self.assertEqual(rect.position, Vector2(j + 0.5, i + 0.5))
                     self.assertEqual(rect.size, Vector2(1, 1))
         with self.subTest(rect=f'box'):
-            self.assertEqual(self.box.min, Vector2(0, 0))
-            self.assertEqual(self.box.max, Vector2(3, 3))
+            self.assertEqual(self.box.top_left, Vector2(0, 0))
+            self.assertEqual(self.box.bottom_right, Vector2(3, 3))
             self.assertEqual(self.box.position, Vector2(1.5, 1.5))
             self.assertEqual(self.box.size, Vector2(3, 3))
         with self.subTest(rect=f'other'):
-            self.assertEqual(self.other.min, Vector2(4, 4))
-            self.assertEqual(self.other.max, Vector2(5, 5))
+            self.assertEqual(self.other.top_left, Vector2(4, 4))
+            self.assertEqual(self.other.bottom_right, Vector2(5, 5))
             self.assertEqual(self.other.position, Vector2(4.5, 4.5))
             self.assertEqual(self.other.size, Vector2(1, 1))
 
@@ -128,10 +128,10 @@ class TestRectangle(unittest.TestCase):
 
     def test_intersection(self):
         center = self.rectangles[(1, 1)]
-        def test_intersection(i, j, min, size):
+        def test_intersection(i, j, tl, size):
             with self.subTest(rect='center', intersection=f'rect in position {i}, {j}'):
                 rect = self.rectangles[(i, j)]
-                expected = self.rect(min=min, size=size)
+                expected = self.rect(tl=tl, size=size)
                 self.assertEqual(center.intersection_with(rect), expected)
                 self.assertEqual(rect.intersection_with(center), expected)
                 self.assertIsNone(rect.intersection_with(self.other))
@@ -230,8 +230,6 @@ class TestPong(unittest.TestCase):
         self.size = Vector2(160, 90)
         self.pong = Pong(size=self.size)
         self.paddle_ratio=Vector2(0.1, 0.01)
-        self.pong.move_paddle(1, Direction.DOWN)
-        self.pong.move_paddle(0, Direction.UP)
         self.ball_ratio=0.05
         self.ball_speed_ratio=0.1
         self.paddle_speed_ratio=0.05
@@ -263,9 +261,9 @@ class TestPong(unittest.TestCase):
     def test_ball_size_is_proportional_to_window_size(self):
         self.assertEqual(self.pong.ball.size, Vector2(self.min_dim * self.ball_ratio))
 
-    def test_ball_speed_is_proportial_to_windows_size_and_random_direction(self):
+    def test_ball_speed_is_proportional_to_windows_size_and_random_direction(self):
         ball_speed_modulus, ball_speed_angle = self.pong.ball.speed.as_polar()
-        self.assertEqual(ball_speed_modulus, self.ball_speed_ratio * self.min_dim)
+        self.assertAlmostEqual(ball_speed_modulus, self.ball_speed_ratio * self.min_dim)
         self.assertGreaterEqual(ball_speed_angle, 0)
         self.assertLessEqual(ball_speed_angle, 2 * math.pi)
 
@@ -281,6 +279,8 @@ class TestPong(unittest.TestCase):
         self.assertEqual(self.pong.paddles[1].position.x, self.size.x - padding)
 
     def test_update(self):
+        self.pong.move_paddle(1, Direction.DOWN)
+        self.pong.move_paddle(0, Direction.UP)
         initial_positions = {
             'ball': self.pong.ball.position,
             'paddles': [paddle.position for paddle in self.pong.paddles]
@@ -297,45 +297,33 @@ class TestPong(unittest.TestCase):
             with self.subTest(obj=f'paddle {i}', initial_pos=initial_positions['paddles'][i], speed=speeds['paddles'][i]):
                 self.assertEqual(paddle.position, initial_positions['paddles'][i] + dt * speeds['paddles'][i])
 
-    def assertHasEntry(self, container, key, value):
-        self.assertIn(key, container)
-        self.assertEqual(container[key], value)
-
     def test_hit_top_border(self):
         ball = self.pong.ball
         ball.position = Vector2(self.size.x / 2, 1)
         border = self.pong.table.borders[Direction.UP]
-        self.assertHasEntry(ball.hits(border), Direction.UP, 1.25)
+        self.assertEqual(ball.hits(border), {Direction.UP: 1.25})
 
     def test_hit_bottom_border(self):
         ball = self.pong.ball
         ball.position = Vector2(self.size.x / 2, self.size.y - 1)
         border = self.pong.table.borders[Direction.DOWN]
-        self.assertHasEntry(ball.hits(border), Direction.DOWN, 1.25)
+        self.assertEqual(ball.hits(border), {Direction.DOWN: 1.25})
 
     def test_hit_left_paddle(self):
         ball = self.pong.ball
         paddle = self.pong.paddles[0]
         ball.position = paddle.position + Vector2(paddle.size.x / 2, 0)
-        self.assertHasEntry(ball.hits(paddle), Direction.LEFT, 2.25)
+        self.assertEqual(ball.hits(paddle), {Direction.LEFT: 2.25})
 
     def test_hit_right_paddle(self):
         ball = self.pong.ball
         paddle = self.pong.paddles[1]
         ball.position = paddle.position - Vector2(paddle.size.x / 2, 0)
-        self.assertHasEntry(ball.hits(paddle), Direction.RIGHT, 2.25)
+        self.assertEqual(ball.hits(paddle), {Direction.RIGHT: 2.25})
 
     def _test_collisions(self, direction: Direction, delta: float = 1, max_rounds=None):
         def log(i):
-            hits = dict()
-            for hittable in self.pong._hittable_objects:
-                hit = self.pong.ball.hits(hittable)
-                if hit:
-                    hits[hittable.name] = {
-                        dir.name: dist
-                        for dir, dist in hit.items()
-                    }
-            print(f"Step {i}: position={self.pong.ball.position}, speed={self.pong.ball.speed}, collisions={hits}")
+            print(f"Step {i}: position={self.pong.ball.position}, speed={self.pong.ball.speed}")
         if max_rounds is None:
             max_rounds = int(max(*self.size) // delta)
         self.pong.ball.speed = direction.value
@@ -344,7 +332,7 @@ class TestPong(unittest.TestCase):
             self.pong.update(delta)
             if self.pong.ball.speed != direction.value:
                 break
-        log(i)
+        log(i + 1)
         with self.subTest(direction=direction.name, rounds=i, max_rounds=max_rounds):
             self.assertLess(i, max_rounds)
             self.assertNotEqual(self.pong.ball.speed, direction.value)

@@ -1,8 +1,7 @@
-from dpongpy import Vector2
+from dpongpy import Vector2, logger
 from dataclasses import dataclass, field
 from random import Random
 from enum import Enum
-# from reactivex.subject import Subject
 import math
 
 
@@ -11,6 +10,12 @@ class Direction(Enum):
     DOWN = Vector2(0, 1)
     LEFT = Vector2(-1, 0)
     RIGHT = Vector2(1, 0)
+
+    def __repr__(self):
+        return f'<{type(self).__name__}.{self.name}>'
+
+    def __str__(self):
+        return repr(self)[1:-1]
 
     @property
     def is_vertical(self) -> bool:
@@ -23,36 +28,78 @@ class Direction(Enum):
 
 @dataclass
 class Rectangle:
-    min: Vector2
-    max: Vector2
+    top_left: Vector2
+    bottom_right: Vector2
+
+    def __post_init__(self):
+        fst, snd = Vector2(self.top_left), Vector2(self.bottom_right)
+        self.top_left = Vector2(min(fst.x, snd.x), min(fst.y, snd.y))
+        self.bottom_right = Vector2(max(fst.x, snd.x), max(fst.y, snd.y))
+
+    @property
+    def top(self) -> float:
+        return self.top_left.y
+
+    @property
+    def bottom(self) -> float:
+        return self.bottom_right.y
+
+    @property
+    def left(self) -> float:
+        return self.top_left.x
+
+    @property
+    def right(self) -> float:
+        return self.bottom_right.x
+
+    @property
+    def top_right(self) -> Vector2:
+        return Vector2(self.bottom_right.x, self.top_left.y)
+    
+    @property
+    def bottom_left(self) -> Vector2:
+        return Vector2(self.top_left.x, self.bottom_right.y)
+    
+    @property
+    def corners(self) -> list[Vector2]:
+        return [self.top_left, self.top_right, self.bottom_right, self.bottom_left]
 
     @property
     def size(self) -> Vector2:
-        return self.max - self.min
+        return self.bottom_right - self.top_left
     
     @property
     def position(self) -> Vector2:
-        return (self.min + self.max) / 2
-
-    def __post_init__(self):
-        fst, snd = Vector2(self.min), Vector2(self.max)
-        self.min = Vector2(min(fst.x, snd.x), min(fst.y, snd.y))
-        self.max = Vector2(max(fst.x, snd.x), max(fst.y, snd.y))
+        return (self.top_left + self.bottom_right) / 2
 
     def overlaps(self, other: 'Rectangle') -> bool:
-        return self.min.x <= other.max.x and self.max.x >= other.min.x and self.min.y <= other.max.y and self.max.y >= other.min.y
+        return self.top_left.x <= other.bottom_right.x \
+            and self.bottom_right.x >= other.top_left.x \
+            and self.top_left.y <= other.bottom_right.y \
+            and self.bottom_right.y >= other.top_left.y
+
+    def is_inside(self, other) -> bool:
+        return self in other
     
-    def is_inside(self, other: 'Rectangle') -> bool:
-        return self.min.x >= other.min.x and self.max.x <= other.max.x and self.min.y >= other.min.y and self.max.y <= other.max.y
-    
-    def __contains__(self, other: 'Rectangle') -> bool:
-        return other.is_inside(self)
+    def __contains__(self, other) -> bool:
+        if isinstance(other, Rectangle):
+            return other.top_left in self and other.bottom_right in self
+        else:
+            x, y = other
+            return self.top_left.x <= x <= self.bottom_right.x and \
+                   self.top_left.y <= y <= self.bottom_right.y
     
     def intersection_with(self, other: 'Rectangle') -> 'Rectangle':
         if self.overlaps(other):
             return Rectangle(
-                Vector2(max(self.min.x, other.min.x), max(self.min.y, other.min.y)), 
-                Vector2(min(self.max.x, other.max.x), min(self.max.y, other.max.y))
+                Vector2(
+                    max(self.top_left.x, other.top_left.x), 
+                    max(self.top_left.y, other.top_left.y)
+                ), 
+                Vector2(
+                    min(self.bottom_right.x, other.bottom_right.x), 
+                    min(self.bottom_right.y, other.bottom_right.y)
+                )
             )
         return None
 
@@ -60,27 +107,76 @@ class Rectangle:
         result = dict()
         intersection = self.intersection_with(other)
         if intersection is not None:
-            if other.min.x < self.min.x:
-                result[Direction.LEFT] = intersection.size.x
-            if other.max.x > self.max.x:
-                result[Direction.RIGHT] = intersection.size.x
-            if other.min.y < self.min.y:
+            tl, tr, br, bl = tuple([corner in self for corner in other.corners])
+            if br and not(tl or tr or bl):
                 result[Direction.UP] = intersection.size.y
-            if other.max.y > self.max.y:
+                result[Direction.LEFT] = intersection.size.x
+            elif bl and not(tr or tl or br):
+                result[Direction.UP] = intersection.size.y
+                result[Direction.RIGHT] = intersection.size.x
+            elif tr and not(bl or br or tl):
                 result[Direction.DOWN] = intersection.size.y
+                result[Direction.LEFT] = intersection.size.x
+            elif tl and not(br or bl or tr):
+                result[Direction.DOWN] = intersection.size.y
+                result[Direction.RIGHT] = intersection.size.x
+            elif (tl and tr and not (bl or br)) or (self.top <= other.top <= self.bottom < other.bottom):
+                result[Direction.DOWN] = intersection.size.y
+            elif (bl and br and not (tl or tr)) or (other.top < self.top <= other.bottom <= self.bottom):
+                result[Direction.UP] = intersection.size.y
+            elif (tl and bl and not (tr or br)) or (self.left <= other.left <= self.right < other.right):
+                result[Direction.RIGHT] = intersection.size.x
+            elif (tr and br and not (tl or bl)) or (other.left < self.left <= other.right <= self.right):
+                result[Direction.LEFT] = intersection.size.x
+            else:
+                raise ValueError("Invalid collision, this is likely a bug")
         return result
 
 
-@dataclass
 class GameObject:
-    size: Vector2
-    position: Vector2 = field(default_factory=Vector2)
-    speed: Vector2 = field(default_factory=Vector2)
-    name: str = field(default=None)
+    def __init__(self, size, position=None, speed=None, name=None):
+        self.size = Vector2(size)
+        self._position = Vector2(position) if position is not None else Vector2()
+        self._speed = Vector2(speed) if speed is not None else Vector2()
+        self.name = name or self.__class__.__name__.lower()
 
-    def __post_init__(self):
-        if self.name is None:
-            self.name = self.__class__.__name__.lower()
+    def __eq__(self, other):
+        return isinstance(other, type(self)) and \
+            self.name == other.name and \
+            self.size == other.size and \
+            self.position == other.position and \
+            self.speed == other.speed
+
+    def __hash__(self):
+        return hash((type(self), self.name, self.size, self.position, self.speed))
+
+    def __repr__(self):
+        return f'<{type(self).__name__}(id={id(self)}, name={self.name}, size={self.size}, position={self.position}, speed={self.speed})>'
+
+    def __str__(self):
+        return f'{self.name}#{id(self)}'
+
+    @property
+    def position(self) -> Vector2:
+        return self._position
+
+    @position.setter
+    def position(self, value: Vector2):
+        old = self._position
+        self._position = Vector2(value)
+        if old is not None and old != self._position:
+            logger.debug(f"{self} moves: {old} -> {self._position}")
+
+    @property
+    def speed(self) -> Vector2:
+        return self._speed
+
+    @speed.setter
+    def speed(self, value: Vector2):
+        old = self._speed
+        self._speed = Vector2(value)
+        if old is not None and old != self._speed:
+            logger.debug(f"{self} accelerates: {old} -> {self._speed}")
 
     @property
     def bounding_box(self) -> Rectangle:
@@ -106,6 +202,7 @@ class Ball(GameObject):
 class Paddle(GameObject):
     pass
 
+
 @dataclass
 class Config:
     paddle_ratio: Vector2 = field(default_factory=lambda: Vector2(0.1, 0.01))
@@ -122,10 +219,10 @@ class Table:
 
     def __post_init__(self):
         borders = dict()
-        borders[Direction.UP] = Rectangle(Vector2(-self.size.x, 0), Vector2(self.size.x * 2, -self.size.y))
-        borders[Direction.DOWN] = Rectangle(Vector2(-self.size.x, self.size.y), Vector2(self.size.x * 2, self.size.y * 2))
-        borders[Direction.LEFT] = Rectangle(Vector2(0, -self.size.y), Vector2(-self.size.x, self.size.y * 2))
-        borders[Direction.RIGHT] = Rectangle(Vector2(self.size.x, -self.size.y), Vector2(self.size.x * 2, self.size.y * 2))
+        borders[Direction.UP] = Rectangle((-self.size.x, 0), (self.size.x * 2, -self.size.y))
+        borders[Direction.DOWN] = Rectangle((-self.size.x, self.size.y), (self.size.x * 2, self.size.y * 2))
+        borders[Direction.LEFT] = Rectangle((0, -self.size.y), (-self.size.x, self.size.y * 2))
+        borders[Direction.RIGHT] = Rectangle((self.size.x, -self.size.y), (self.size.x * 2, self.size.y * 2))
         self.borders = dict()
         for dir, rect in borders.items():
             self.borders[dir] = GameObject(
@@ -183,11 +280,13 @@ class Pong:
         for hittable in self._hittable_objects:
             hits = self.ball.hits(hittable)
             for direction, delta in hits.items():
-                self.ball.position = self.ball.position + direction.value * -delta
-                if direction.is_horizontal:
-                    self.ball.speed.y *= -1
-                if direction.is_vertical:
-                    self.ball.speed.x *= -1
+                logger.debug(f"{self.ball} hits {hittable} in direction {direction.name}, overlap is {delta}")
+                if delta > 0.0:
+                    self.ball.position = self.ball.position + direction.value * -delta
+                    if direction.is_horizontal:
+                        self.ball.speed = Vector2(-self.ball.speed.x, self.ball.speed.y)
+                    if direction.is_vertical:
+                        self.ball.speed = Vector2(self.ball.speed.x, -self.ball.speed.y)
 
     def move_paddle(self, paddle: int, direction: Direction | None):
         assert direction.is_vertical, "Direction must be vertical"
