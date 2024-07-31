@@ -1,5 +1,6 @@
 import unittest
 from dpongpy.model import *
+import math
 
 
 class TestDirection(unittest.TestCase):
@@ -45,6 +46,11 @@ class TestRectangle(unittest.TestCase):
 
     def all_rectangles(self):
         return list(self.rectangles.values()) + [self.box, self.other]
+
+    def test_create_from_wrong_args(self):
+        rect = Rectangle((0, 0), (10, -10))
+        self.assertEqual(rect.min, Vector2(0, -10))
+        self.assertEqual(rect.max, Vector2(10, 0))
 
     def test_properties(self):
         for i, j in self.indexes():
@@ -157,3 +163,201 @@ class TestRectangle(unittest.TestCase):
                 rect = self.rectangles[(i, j)]
                 self.assertEqual(rect.intersection_with(self.box), rect)
                 self.assertEqual(self.box.intersection_with(rect), rect)
+    
+    def test_hits_bigger_with_smaller(self):
+        center = self.rectangles[(1, 1)]
+        with self.subTest(rect='center', hits=f'rect in position {0}, {0}'):
+            hits = center.hits(self.rectangles[(0, 0)])
+            self.assertEqual(hits, {Direction.LEFT: 0.5, Direction.UP: 0.5})
+        with self.subTest(rect='center', hits=f'rect in position {0}, {1}'):
+            hits = center.hits(self.rectangles[(0, 1)])
+            self.assertEqual(hits, {Direction.UP: 0.5})
+        with self.subTest(rect='center', hits=f'rect in position {0}, {2}'):
+            hits = center.hits(self.rectangles[(0, 2)])
+            self.assertEqual(hits, {Direction.UP: 0.5, Direction.RIGHT: 0.5})
+        with self.subTest(rect='center', hits=f'rect in position {1}, {0}'):
+            hits = center.hits(self.rectangles[(1, 0)])
+            self.assertEqual(hits, {Direction.LEFT: 0.5})
+        with self.subTest(rect='center', hits=f'rect in position {1}, {2}'):
+            hits = center.hits(self.rectangles[(1, 2)])
+            self.assertEqual(hits, {Direction.RIGHT: 0.5})
+        with self.subTest(rect='center', hits=f'rect in position {2}, {0}'):
+            hits = center.hits(self.rectangles[(2, 0)])
+            self.assertEqual(hits, {Direction.LEFT: 0.5, Direction.DOWN: 0.5})
+        with self.subTest(rect='center', hits=f'rect in position {2}, {1}'):
+            hits = center.hits(self.rectangles[(2, 1)])
+            self.assertEqual(hits, {Direction.DOWN: 0.5})
+        with self.subTest(rect='center', hits=f'rect in position {2}, {2}'):
+            hits = center.hits(self.rectangles[(2, 2)])
+            self.assertEqual(hits, {Direction.DOWN: 0.5, Direction.RIGHT: 0.5})
+
+    def test_hits_smaller_with_bigger(self):
+        center = self.rectangles[(1, 1)]
+        with self.subTest(rect=f'in position {0}, {0}', hits='center'):
+            hits = self.rectangles[(0, 0)].hits(center)
+            self.assertEqual(hits, {Direction.RIGHT: 0.5, Direction.DOWN: 0.5})
+        with self.subTest(rect=f'in position {0}, {1}', hits='center'):
+            hits = self.rectangles[(0, 1)].hits(center)
+            self.assertEqual(hits, {Direction.DOWN: 0.5})
+        with self.subTest(rect=f'in position {0}, {2}', hits='center'):
+            hits = self.rectangles[(0, 2)].hits(center)
+            self.assertEqual(hits, {Direction.DOWN: 0.5, Direction.LEFT: 0.5})
+        with self.subTest(rect=f'in position {1}, {0}', hits='center'):
+            hits = self.rectangles[(1, 0)].hits(center)
+            self.assertEqual(hits, {Direction.RIGHT: 0.5})
+        with self.subTest(rect=f'in position {1}, {2}', hits='center'):
+            hits = self.rectangles[(1, 2)].hits(center)
+            self.assertEqual(hits, {Direction.LEFT: 0.5})
+        with self.subTest(rect=f'in position {2}, {0}', hits='center'):
+            hits = self.rectangles[(2, 0)].hits(center)
+            self.assertEqual(hits, {Direction.RIGHT: 0.5, Direction.UP: 0.5})
+        with self.subTest(rect=f'in position {2}, {1}', hits='center'):
+            hits = self.rectangles[(2, 1)].hits(center)
+            self.assertEqual(hits, {Direction.UP: 0.5})
+        with self.subTest(rect=f'in position {2}, {2}', hits='center'):
+            hits = self.rectangles[(2, 2)].hits(center)
+            self.assertEqual(hits, {Direction.UP: 0.5, Direction.LEFT: 0.5})
+    
+    def test_not_hits(self):
+        center = self.rectangles[(1, 1)]
+        with self.subTest(rect='center', doesnt_hit=f'other'):
+            hits = center.hits(self.other)
+            self.assertEqual(hits, {})
+    
+
+class TestPong(unittest.TestCase):
+    def setUp(self) -> None:
+        self.size = Vector2(160, 90)
+        self.pong = Pong(size=self.size)
+        self.paddle_ratio=Vector2(0.1, 0.01)
+        self.pong.move_paddle(1, Direction.DOWN)
+        self.pong.move_paddle(0, Direction.UP)
+        self.ball_ratio=0.05
+        self.ball_speed_ratio=0.1
+        self.paddle_speed_ratio=0.05
+        self.paddle_padding=0.05
+        self.expected_config = Config(
+            self.paddle_ratio,
+            self.ball_ratio,
+            self.ball_speed_ratio,
+            self.paddle_speed_ratio,
+            self.paddle_padding,
+        )
+        self.min_dim = min(*self.size)
+
+    def test_initial_config(self):
+        self.assertEqual(
+            self.pong.config, 
+            self.expected_config
+        )
+
+    def test_two_paddles(self):
+        self.assertEqual(len(self.pong.paddles), 2)
+
+    def test_paddle_size(self):
+        self.assertEqual(self.pong.size, self.size)
+
+    def test_ball_position_is_initially_centered(self):
+        self.assertEqual(self.pong.ball.position, self.size / 2)
+
+    def test_ball_size_is_proportional_to_window_size(self):
+        self.assertEqual(self.pong.ball.size, Vector2(self.min_dim * self.ball_ratio))
+
+    def test_ball_speed_is_proportial_to_windows_size_and_random_direction(self):
+        ball_speed_modulus, ball_speed_angle = self.pong.ball.speed.as_polar()
+        self.assertEqual(ball_speed_modulus, self.ball_speed_ratio * self.min_dim)
+        self.assertGreaterEqual(ball_speed_angle, 0)
+        self.assertLessEqual(ball_speed_angle, 2 * math.pi)
+
+    def test_paddle_size_is_proportional_to_window_size(self):
+        for paddle in self.pong.paddles:
+            self.assertEqual(paddle.size, Vector2(self.size.elementwise() * self.paddle_ratio))
+
+    def test_paddle_position_is_initially_centered_vertically(self):
+        for paddle in self.pong.paddles:
+            self.assertEqual(paddle.position.y, self.size.y / 2)
+        padding = self.paddle_padding * self.size.x + (self.size.elementwise() * self.paddle_ratio).x / 2
+        self.assertEqual(self.pong.paddles[0].position.x, padding)
+        self.assertEqual(self.pong.paddles[1].position.x, self.size.x - padding)
+
+    def test_update(self):
+        initial_positions = {
+            'ball': self.pong.ball.position,
+            'paddles': [paddle.position for paddle in self.pong.paddles]
+        }
+        speeds = {
+            'ball': self.pong.ball.speed,
+            'paddles': [paddle.speed for paddle in self.pong.paddles]
+        }
+        dt = 2
+        self.pong.update(dt)
+        with self.subTest(obj='ball', initial_pos=initial_positions['ball'], speed=speeds['ball']):
+            self.assertEqual(self.pong.ball.position, initial_positions['ball'] + dt * speeds['ball'])
+        for i, paddle in enumerate(self.pong.paddles):
+            with self.subTest(obj=f'paddle {i}', initial_pos=initial_positions['paddles'][i], speed=speeds['paddles'][i]):
+                self.assertEqual(paddle.position, initial_positions['paddles'][i] + dt * speeds['paddles'][i])
+
+    def assertHasEntry(self, container, key, value):
+        self.assertIn(key, container)
+        self.assertEqual(container[key], value)
+
+    def test_hit_top_border(self):
+        ball = self.pong.ball
+        ball.position = Vector2(self.size.x / 2, 1)
+        border = self.pong.table.borders[Direction.UP]
+        self.assertHasEntry(ball.hits(border), Direction.UP, 1.25)
+
+    def test_hit_bottom_border(self):
+        ball = self.pong.ball
+        ball.position = Vector2(self.size.x / 2, self.size.y - 1)
+        border = self.pong.table.borders[Direction.DOWN]
+        self.assertHasEntry(ball.hits(border), Direction.DOWN, 1.25)
+
+    def test_hit_left_paddle(self):
+        ball = self.pong.ball
+        paddle = self.pong.paddles[0]
+        ball.position = paddle.position + Vector2(paddle.size.x / 2, 0)
+        self.assertHasEntry(ball.hits(paddle), Direction.LEFT, 2.25)
+
+    def test_hit_right_paddle(self):
+        ball = self.pong.ball
+        paddle = self.pong.paddles[1]
+        ball.position = paddle.position - Vector2(paddle.size.x / 2, 0)
+        self.assertHasEntry(ball.hits(paddle), Direction.RIGHT, 2.25)
+
+    def _test_collisions(self, direction: Direction, delta: float = 1, max_rounds=None):
+        def log(i):
+            hits = dict()
+            for hittable in self.pong._hittable_objects:
+                hit = self.pong.ball.hits(hittable)
+                if hit:
+                    hits[hittable.name] = {
+                        dir.name: dist
+                        for dir, dist in hit.items()
+                    }
+            print(f"Step {i}: position={self.pong.ball.position}, speed={self.pong.ball.speed}, collisions={hits}")
+        if max_rounds is None:
+            max_rounds = int(max(*self.size) // delta)
+        self.pong.ball.speed = direction.value
+        for i in range(max_rounds + 1):
+            log(i)
+            self.pong.update(delta)
+            if self.pong.ball.speed != direction.value:
+                break
+        log(i)
+        with self.subTest(direction=direction.name, rounds=i, max_rounds=max_rounds):
+            self.assertLess(i, max_rounds)
+            self.assertNotEqual(self.pong.ball.speed, direction.value)
+
+    def test_collision_with_top_border(self):
+        self._test_collisions(Direction.UP)
+
+    def test_collision_with_bottom_border(self):
+        self._test_collisions(Direction.DOWN)
+
+    def test_collision_with_left_paddle(self):
+        self._test_collisions(Direction.LEFT)
+
+    def test_collision_with_right_paddle(self):
+        self._test_collisions(Direction.RIGHT)
+    

@@ -35,9 +35,9 @@ class Rectangle:
         return (self.min + self.max) / 2
 
     def __post_init__(self):
-        points = [self.min, self.max]
-        points.sort(key=lambda p: p.as_polar()[0])
-        self.min, self.max = points
+        fst, snd = Vector2(self.min), Vector2(self.max)
+        self.min = Vector2(min(fst.x, snd.x), min(fst.y, snd.y))
+        self.max = Vector2(max(fst.x, snd.x), max(fst.y, snd.y))
 
     def overlaps(self, other: 'Rectangle') -> bool:
         return self.min.x <= other.max.x and self.max.x >= other.min.x and self.min.y <= other.max.y and self.max.y >= other.min.y
@@ -75,14 +75,20 @@ class Rectangle:
 class GameObject:
     size: Vector2
     position: Vector2 = field(default_factory=Vector2)
+    speed: Vector2 = field(default_factory=Vector2)
+    name: str = field(default=None)
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = self.__class__.__name__.lower()
 
     @property
     def bounding_box(self) -> Rectangle:
         half_size = self.size / 2
-        return self.position - half_size, self.position + half_size
+        return Rectangle(self.position - half_size, self.position + half_size)
 
     def update(self, delta_time: float):
-        self.position += self.speed * delta_time
+        self.position = self.position + self.speed * delta_time
 
 
 for method_name in ['overlaps', 'is_inside', '__contains__', 'intersection_with', 'hits']:
@@ -93,23 +99,12 @@ for method_name in ['overlaps', 'is_inside', '__contains__', 'intersection_with'
     setattr(GameObject, method_name, method)
 
 
-class Paddle(GameObject):
-    def update(self, delta_time: float, speed: Vector2 | float = None):
-        if speed is not None:
-            self.speed = speed
-        if isinstance(self.speed, float):
-            self.speed = Vector2(0, self.speed)
-        super().update(delta_time)
-
-
 class Ball(GameObject):
-    def update(self, delta_time: float, swap_x: bool = False, swap_y: bool = False):
-        if swap_x:
-            self.speed.x *= -1
-        if swap_y:
-            self.speed.y *= -1
-        return super().update(delta_time)
+    pass
 
+
+class Paddle(GameObject):
+    pass
 
 @dataclass
 class Config:
@@ -117,30 +112,27 @@ class Config:
     ball_ratio: float = 0.05
     ball_speed_ratio: float = 0.1
     paddle_speed_ratio: float = 0.05
-    paddle_padding = 0.05
+    paddle_padding: float = 0.05
 
 
 @dataclass
 class Table:
     size: Vector2
-    borders: dict[Direction, Rectangle] = field(init=False)
+    borders: dict[Direction, GameObject] = field(init=False)
 
     def __post_init__(self):
-        self.borders[Direction.UP] = Rectangle(Vector2(-self.size.x, 0), Vector2(self.size.x * 2, -self.size.y))
-        self.borders[Direction.DOWN] = Rectangle(Vector2(-self.size.x, self.size.y), Vector2(self.size.x * 2, self.size.y * 2))
-        self.borders[Direction.LEFT] = Rectangle(Vector2(0, -self.size.y), Vector2(-self.size.x, self.size.y * 2))
-        self.borders[Direction.RIGHT] = Rectangle(Vector2(self.size.x, -self.size.y), Vector2(self.size.x * 2, self.size.y * 2))
-        
-
-    # def hits_border(self, obj: GameObject | Rectangle) -> dict[Direction, float]:
-    #     if isinstance(obj, GameObject):
-    #         obj = obj.bounding_box
-    #     result = set()
-    #     for direction, border in self.borders.items():
-    #         if obj.bounding_box.overlaps(border):
-    #             intersection = obj.bounding_box.intersection(border).size
-    #             result[direction] = intersection.x if direction.is_horizontal else intersection.y
-    #     return result
+        borders = dict()
+        borders[Direction.UP] = Rectangle(Vector2(-self.size.x, 0), Vector2(self.size.x * 2, -self.size.y))
+        borders[Direction.DOWN] = Rectangle(Vector2(-self.size.x, self.size.y), Vector2(self.size.x * 2, self.size.y * 2))
+        borders[Direction.LEFT] = Rectangle(Vector2(0, -self.size.y), Vector2(-self.size.x, self.size.y * 2))
+        borders[Direction.RIGHT] = Rectangle(Vector2(self.size.x, -self.size.y), Vector2(self.size.x * 2, self.size.y * 2))
+        self.borders = dict()
+        for dir, rect in borders.items():
+            self.borders[dir] = GameObject(
+                size=rect.size,
+                position=rect.position,
+                name=f"border_{dir.name.lower()}"
+            )
 
 
 @dataclass
@@ -153,33 +145,32 @@ class Pong:
     random: Random = field(default_factory=Random)
 
     def __post_init__(self):
+        self.size = Vector2(self.size)
         assert self.size.x > 0 and self.size.y > 0, "Size must be greater than 0"
         self.ball = self._init_ball()
         self.paddles = self._init_paddles()
         self.table = Table(self.size)
 
     @property
-    def _hittable_objects(self) -> list[Rectangle]:
-        return [paddle.bouding_box for paddle in self.paddles] \
-            + list(self.table.borders.values())
+    def _hittable_objects(self) -> list[GameObject]:
+        return [paddle for paddle in self.paddles] + list(self.table.borders.values())
 
     def _init_ball(self) -> Ball:
         min_dimension = min(*self.size)
         ball_size = Vector2(min_dimension * self.config.ball_ratio)
         ball = Ball(size=ball_size, position=self.size / 2)
-        ball.speed = Vector2.from_polar(
-            min_dimension * self.config.ball_speed_ratio,
-            self.random.uniform(0, 2 * math.pi)
-        )
+        polar_speed = (min_dimension * self.config.ball_speed_ratio, self.random.uniform(0, 2 * math.pi))
+        ball.speed = Vector2.from_polar(polar_speed)
         return ball
     
     def _init_paddles(self) -> list[Paddle]:
         paddle_size = self.size.elementwise() * self.config.paddle_ratio
-        position1 = Vector2(self.size.x * self.config.paddle_padding, self.size.y / 2)
-        position2 = Vector2(self.size.x * (1 - self.config.paddle_padding), self.size.y / 2)
+        padding = self.size.x * self.config.paddle_padding + paddle_size.x / 2
+        position1 = Vector2(padding, self.size.y / 2)
+        position2 = Vector2(self.size.x - padding, self.size.y / 2)
         return (
-            Paddle(size=paddle_size, position=position1),
-            Paddle(size=paddle_size, position=position2)
+            Paddle(size=paddle_size, position=position1, name="paddle_1"),
+            Paddle(size=paddle_size, position=position2, name="paddle_2")
         )
 
     def update(self, delta_time: float):
@@ -192,7 +183,7 @@ class Pong:
         for hittable in self._hittable_objects:
             hits = self.ball.hits(hittable)
             for direction, delta in hits.items():
-                self.ball += direction.value * -delta
+                self.ball.position = self.ball.position + direction.value * -delta
                 if direction.is_horizontal:
                     self.ball.speed.y *= -1
                 if direction.is_vertical:
