@@ -2,7 +2,6 @@ from dpongpy import Vector2, logger
 from dataclasses import dataclass, field
 from random import Random
 from enum import Enum
-import math
 
 
 class Direction(Enum):
@@ -26,8 +25,32 @@ class Direction(Enum):
         return self.value.y == 0
 
 
+# noinspection PyUnresolvedReferences
+class Sized:
+
+    @property
+    def width(self) -> Vector2:
+        return self.size.x
+
+    @property
+    def height(self) -> Vector2:
+        return self.size.y
+
+
+# noinspection PyUnresolvedReferences
+class Positioned:
+
+    @property
+    def x(self) -> Vector2:
+        return self.position.x
+
+    @property
+    def y(self) -> Vector2:
+        return self.position.y
+
+
 @dataclass
-class Rectangle:
+class Rectangle(Sized, Positioned):
     top_left: Vector2
     bottom_right: Vector2
 
@@ -54,11 +77,11 @@ class Rectangle:
 
     @property
     def top_right(self) -> Vector2:
-        return Vector2(self.bottom_right.x, self.top_left.y)
+        return Vector2(self.right, self.top)
     
     @property
     def bottom_left(self) -> Vector2:
-        return Vector2(self.top_left.x, self.bottom_right.y)
+        return Vector2(self.left, self.bottom)
     
     @property
     def corners(self) -> list[Vector2]:
@@ -73,10 +96,10 @@ class Rectangle:
         return (self.top_left + self.bottom_right) / 2
 
     def overlaps(self, other: 'Rectangle') -> bool:
-        return self.top_left.x <= other.bottom_right.x \
-            and self.bottom_right.x >= other.top_left.x \
-            and self.top_left.y <= other.bottom_right.y \
-            and self.bottom_right.y >= other.top_left.y
+        return self.left <= other.right \
+            and self.right >= other.left \
+            and self.top <= other.bottom \
+            and self.bottom >= other.top
 
     def is_inside(self, other) -> bool:
         return self in other
@@ -86,19 +109,18 @@ class Rectangle:
             return other.top_left in self and other.bottom_right in self
         else:
             x, y = other
-            return self.top_left.x <= x <= self.bottom_right.x and \
-                   self.top_left.y <= y <= self.bottom_right.y
+            return self.left <= x <= self.right and self.top <= y <= self.bottom
     
     def intersection_with(self, other: 'Rectangle') -> 'Rectangle':
         if self.overlaps(other):
             return Rectangle(
                 Vector2(
-                    max(self.top_left.x, other.top_left.x), 
-                    max(self.top_left.y, other.top_left.y)
+                    max(self.left, other.left), 
+                    max(self.top, other.top)
                 ), 
                 Vector2(
-                    min(self.bottom_right.x, other.bottom_right.x), 
-                    min(self.bottom_right.y, other.bottom_right.y)
+                    min(self.right, other.right), 
+                    min(self.bottom, other.bottom)
                 )
             )
         return None
@@ -109,33 +131,33 @@ class Rectangle:
         if intersection is not None:
             tl, tr, br, bl = tuple([corner in self for corner in other.corners])
             if br and not(tl or tr or bl):
-                result[Direction.UP] = intersection.size.y
-                result[Direction.LEFT] = intersection.size.x
+                result[Direction.UP] = intersection.height
+                result[Direction.LEFT] = intersection.width
             elif bl and not(tr or tl or br):
-                result[Direction.UP] = intersection.size.y
-                result[Direction.RIGHT] = intersection.size.x
+                result[Direction.UP] = intersection.height
+                result[Direction.RIGHT] = intersection.width
             elif tr and not(bl or br or tl):
-                result[Direction.DOWN] = intersection.size.y
-                result[Direction.LEFT] = intersection.size.x
+                result[Direction.DOWN] = intersection.height
+                result[Direction.LEFT] = intersection.width
             elif tl and not(br or bl or tr):
-                result[Direction.DOWN] = intersection.size.y
-                result[Direction.RIGHT] = intersection.size.x
+                result[Direction.DOWN] = intersection.height
+                result[Direction.RIGHT] = intersection.width
             elif (tl and tr and not (bl or br)) or (self.top <= other.top <= self.bottom < other.bottom):
-                result[Direction.DOWN] = intersection.size.y
+                result[Direction.DOWN] = intersection.height
             elif (bl and br and not (tl or tr)) or (other.top < self.top <= other.bottom <= self.bottom):
-                result[Direction.UP] = intersection.size.y
+                result[Direction.UP] = intersection.height
             elif (tl and bl and not (tr or br)) or (self.left <= other.left <= self.right < other.right):
-                result[Direction.RIGHT] = intersection.size.x
+                result[Direction.RIGHT] = intersection.width
             elif (tr and br and not (tl or bl)) or (other.left < self.left <= other.right <= self.right):
-                result[Direction.LEFT] = intersection.size.x
+                result[Direction.LEFT] = intersection.width
             else:
                 raise ValueError("Invalid collision, this is likely a bug")
         return result
 
 
-class GameObject:
+class GameObject(Sized, Positioned):
     def __init__(self, size, position=None, speed=None, name=None):
-        self.size = Vector2(size)
+        self._size = Vector2(size)
         self._position = Vector2(position) if position is not None else Vector2()
         self._speed = Vector2(speed) if speed is not None else Vector2()
         self.name = name or self.__class__.__name__.lower()
@@ -155,6 +177,17 @@ class GameObject:
 
     def __str__(self):
         return f'{self.name}#{id(self)}'
+
+    @property
+    def size(self) -> Vector2:
+        return self._size
+
+    @size.setter
+    def size(self, value: Vector2):
+        old = self._size
+        self._size = Vector2(value)
+        if old is not None and old != self._size:
+            logger.debug(f"{self} resized: {old} -> {self._size}")
 
     @property
     def position(self) -> Vector2:
@@ -213,16 +246,16 @@ class Config:
 
 
 @dataclass
-class Table:
+class Table(Sized):
     size: Vector2
     borders: dict[Direction, GameObject] = field(init=False)
 
     def __post_init__(self):
         borders = dict()
-        borders[Direction.UP] = Rectangle((-self.size.x, 0), (self.size.x * 2, -self.size.y))
-        borders[Direction.DOWN] = Rectangle((-self.size.x, self.size.y), (self.size.x * 2, self.size.y * 2))
-        borders[Direction.LEFT] = Rectangle((0, -self.size.y), (-self.size.x, self.size.y * 2))
-        borders[Direction.RIGHT] = Rectangle((self.size.x, -self.size.y), (self.size.x * 2, self.size.y * 2))
+        borders[Direction.UP] = Rectangle((-self.width, 0), (self.width * 2, -self.height))
+        borders[Direction.DOWN] = Rectangle((-self.width, self.height), (self.width * 2, self.height * 2))
+        borders[Direction.LEFT] = Rectangle((0, -self.height), (-self.width, self.height * 2))
+        borders[Direction.RIGHT] = Rectangle((self.width, -self.height), (self.width * 2, self.height * 2))
         self.borders = dict()
         for dir, rect in borders.items():
             self.borders[dir] = GameObject(
@@ -233,7 +266,7 @@ class Table:
 
 
 @dataclass
-class Pong:
+class Pong(Sized):
     size: Vector2
     config: Config = field(default_factory=Config)
     ball: Ball = field(init=False)
@@ -243,7 +276,7 @@ class Pong:
 
     def __post_init__(self):
         self.size = Vector2(self.size)
-        assert self.size.x > 0 and self.size.y > 0, "Size must be greater than 0"
+        assert self.width > 0 and self.height > 0, "Size must be greater than 0"
         self.ball = self._init_ball()
         self.paddles = self._init_paddles()
         self.table = Table(self.size)
@@ -256,19 +289,19 @@ class Pong:
         min_dimension = min(*self.size)
         ball_size = Vector2(min_dimension * self.config.ball_ratio)
         ball = Ball(size=ball_size, position=self.size / 2)
-        polar_speed = (min_dimension * self.config.ball_speed_ratio, self.random.uniform(0, 2 * math.pi))
+        polar_speed = (min_dimension * self.config.ball_speed_ratio, self.random.uniform(0, 360))
         ball.speed = Vector2.from_polar(polar_speed)
         return ball
     
     def _init_paddles(self) -> list[Paddle]:
         paddle_size = self.size.elementwise() * self.config.paddle_ratio
-        padding = self.size.x * self.config.paddle_padding + paddle_size.x / 2
-        position1 = Vector2(padding, self.size.y / 2)
-        position2 = Vector2(self.size.x - padding, self.size.y / 2)
-        return (
+        padding = self.width * self.config.paddle_padding + paddle_size.x / 2
+        position1 = Vector2(padding, self.height / 2)
+        position2 = Vector2(self.width - padding, self.height / 2)
+        return [
             Paddle(size=paddle_size, position=position1, name="paddle_1"),
             Paddle(size=paddle_size, position=position2, name="paddle_2")
-        )
+        ]
 
     def update(self, delta_time: float):
         self.ball.update(delta_time)
@@ -289,11 +322,11 @@ class Pong:
                         self.ball.speed = Vector2(self.ball.speed.x, -self.ball.speed.y)
 
     def move_paddle(self, paddle: int, direction: Direction | None):
-        assert direction.is_vertical, "Direction must be vertical"
+        assert direction is None or direction.is_vertical, "Direction must be vertical, if provided"
         if direction is None:
             self.paddles[paddle].speed = Vector2(0, 0)
         else:
-            self.paddles[paddle].speed = direction.value * self.size.y * self.config.paddle_speed_ratio
+            self.paddles[paddle].speed = direction.value * self.height * self.config.paddle_speed_ratio
     
     def stop_paddle(self, paddle: int):
         self.move_paddle(paddle, None)
