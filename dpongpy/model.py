@@ -238,10 +238,10 @@ class Paddle(GameObject):
 
 @dataclass
 class Config:
-    paddle_ratio: Vector2 = field(default_factory=lambda: Vector2(0.1, 0.01))
+    paddle_ratio: Vector2 = field(default_factory=lambda: Vector2(0.01, 0.1))
     ball_ratio: float = 0.05
-    ball_speed_ratio: float = 0.1
-    paddle_speed_ratio: float = 0.05
+    ball_speed_ratio: float = 0.2
+    paddle_speed_ratio: float = 0.2
     paddle_padding: float = 0.05
 
 

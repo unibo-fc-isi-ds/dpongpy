@@ -1,5 +1,5 @@
 import logging
-from pygame import Vector2
+from pygame import Vector2, Rect
 
 
 logging.basicConfig(level=logging.DEBUG)
