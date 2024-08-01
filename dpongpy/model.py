@@ -308,19 +308,22 @@ class Pong(Sized):
         self.ball.update(delta_time)
         for paddle in self.paddles:
             paddle.update(delta_time)
-        self._handle_collisions()
+        self._handle_collisions(self.ball, self._hittable_objects)
+        for paddle in self.paddles:
+            self._handle_collisions(paddle, self.table.borders.values())
 
-    def _handle_collisions(self):
-        for hittable in self._hittable_objects:
-            hits = self.ball.hits(hittable)
+    def _handle_collisions(self, subject, objects):
+        for hittable in objects:
+            hits = subject.hits(hittable)
             for direction, delta in hits.items():
-                logger.debug(f"{self.ball} hits {hittable} in direction {direction.name}, overlap is {delta}")
+                logger.debug(f"{subject} hits {hittable} in direction {direction.name}, overlap is {delta}")
                 if delta > 0.0:
-                    self.ball.position = self.ball.position + direction.value * -delta
+                    subject.position = subject.position + direction.value * -delta
                     if direction.is_horizontal:
-                        self.ball.speed = Vector2(-self.ball.speed.x, self.ball.speed.y)
+                        subject.speed = Vector2(-subject.speed.x, subject.speed.y)
                     if direction.is_vertical:
-                        self.ball.speed = Vector2(self.ball.speed.x, -self.ball.speed.y)
+                        subject.speed = Vector2(subject.speed.x, -subject.speed.y)
+
 
     def move_paddle(self, paddle: int, direction: Direction | None):
         assert direction is None or direction.is_vertical, "Direction must be vertical, if provided"
