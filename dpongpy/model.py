@@ -1,4 +1,5 @@
-from dpongpy import Vector2, logger
+from pygame.math import Vector2
+from .log import logger
 from dataclasses import dataclass, field
 from random import Random
 from enum import Enum
