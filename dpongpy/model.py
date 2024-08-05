@@ -6,6 +6,7 @@ from enum import Enum
 
 
 class Direction(Enum):
+    NONE = Vector2(0, 0)
     UP = Vector2(0, -1)
     DOWN = Vector2(0, 1)
     LEFT = Vector2(-1, 0)
@@ -19,22 +20,26 @@ class Direction(Enum):
 
     @property
     def is_vertical(self) -> bool:
-        return self.value.x == 0
+        return self.value.x == 0 and self.value.y != 0
     
     @property
     def is_horizontal(self) -> bool:
-        return self.value.y == 0
+        return self.value.y == 0 and self.value.x != 0
+
+    @classmethod
+    def values(cls) -> set['Direction']:
+        return set(cls.__members__.values())
 
 
 # noinspection PyUnresolvedReferences
 class Sized:
 
     @property
-    def width(self) -> Vector2:
+    def width(self) -> float:
         return self.size.x
 
     @property
-    def height(self) -> Vector2:
+    def height(self) -> float:
         return self.size.y
 
 
@@ -42,11 +47,11 @@ class Sized:
 class Positioned:
 
     @property
-    def x(self) -> Vector2:
+    def x(self) -> float:
         return self.position.x
 
     @property
-    def y(self) -> Vector2:
+    def y(self) -> float:
         return self.position.y
 
 
@@ -234,7 +239,21 @@ class Ball(GameObject):
 
 
 class Paddle(GameObject):
-    pass
+    _admissible_directions = Direction.values() - {Direction.NONE}
+
+    def __init__(self, size, side: Direction, position=None, speed=None, name=None):
+        assert isinstance(side, Direction) and side in self._admissible_directions, f"Invalid direction {side}"
+        super().__init__(size, position, speed, name or "paddle_" + side.name.lower())
+        self.side = side
+
+    def __repr__(self):
+        return super().__repr__().replace(')>', f", side={self.side})>")
+
+    def __hash__(self):
+        return hash((super().__hash__(), self.side))
+
+    def __eq__(self, other):
+        return super().__eq__(other) and self.side == other.side
 
 
 @dataclass
@@ -266,45 +285,87 @@ class Table(Sized):
             )
 
 
-@dataclass
 class Pong(Sized):
-    size: Vector2
-    config: Config = field(default_factory=Config)
-    ball: Ball = field(init=False)
-    paddles: list[Paddle] = field(init=False)
-    table: Table = field(init=False)
-    random: Random = field(default_factory=Random)
 
-    def __post_init__(self):
-        self.size = Vector2(self.size)
-        assert self.width > 0 and self.height > 0, "Size must be greater than 0"
-        self.ball = self._init_ball()
-        self.paddles = self._init_paddles()
+    def __init__(self, size, config=None, paddles=(Direction.LEFT, Direction.RIGHT), random=None):
+        self.size = Vector2(size)
+        self.config = config or Config()
+        self.random = random or Random()
+        self.ball = None
+        self.reset_ball()
         self.table = Table(self.size)
+        self.updates = 0
+        self.time = 0
+        self.paddles = [paddle for paddle in paddles if isinstance(paddle, Paddle)]
+        self._init_paddles((side for side in paddles if isinstance(side, Direction)))
+
+    @property
+    def paddles(self) -> list[Paddle]:
+        return list(self._paddles.values())
+
+    def __repr__(self):
+        return (f'<{type(self).__name__}('
+                f'id={id(self)}, '
+                f'size={self.size}, '
+                f'time={self.time}, '
+                f'updates={self.updates}, '
+                f'config={self.config}'
+                f'ball={repr(self.ball)}, '
+                f'paddles={self.paddles}, '
+                f')>')
+
+    @paddles.setter
+    def paddles(self, paddles):
+        self._paddles = {}
+        for paddle in paddles:
+            assert isinstance(paddle, Paddle), f"Invalid paddle: {paddle}"
+            self._paddles[paddle.side] = paddle
 
     @property
     def _hittable_objects(self) -> list[GameObject]:
-        return [paddle for paddle in self.paddles] + list(self.table.borders.values())
+        return self.paddles + list(self.table.borders.values())
 
-    def _init_ball(self) -> Ball:
+    def reset_ball(self):
         min_dimension = min(*self.size)
         ball_size = Vector2(min_dimension * self.config.ball_ratio)
-        ball = Ball(size=ball_size, position=self.size / 2)
+        if self.ball is None:
+            self.ball = Ball(size=ball_size, position=self.size / 2)
+        else:
+            self.ball.size = ball_size
+            self.ball.position = self.size / 2
         polar_speed = (min_dimension * self.config.ball_speed_ratio, self.random.uniform(0, 360))
-        ball.speed = Vector2.from_polar(polar_speed)
-        return ball
-    
-    def _init_paddles(self) -> list[Paddle]:
-        paddle_size = self.size.elementwise() * self.config.paddle_ratio
-        padding = self.width * self.config.paddle_padding + paddle_size.x / 2
-        position1 = Vector2(padding, self.height / 2)
-        position2 = Vector2(self.width - padding, self.height / 2)
-        return [
-            Paddle(size=paddle_size, position=position1, name="paddle_1"),
-            Paddle(size=paddle_size, position=position2, name="paddle_2")
-        ]
+        self.ball.speed = Vector2.from_polar(polar_speed)
+
+    def add_paddle(self, side: Direction.UP):
+        assert side is not None and side != Direction.NONE, "Invalid side"
+        if side in self._paddles:
+            raise ValueError(f"Paddle one side {side} already exists")
+        paddle_ratio = self.config.paddle_ratio
+        if side.is_vertical:
+            paddle_ratio = (paddle_ratio.y, paddle_ratio.x)
+        paddle_size = self.size.elementwise() * paddle_ratio
+        padding = self.width * self.config.paddle_padding + paddle_size.x / 2 if side.is_horizontal \
+            else self.height * self.config.paddle_padding + paddle_size.y / 2
+        if side == Direction.UP:
+            position = Vector2(self.width / 2, padding)
+        elif side == Direction.RIGHT:
+            position = Vector2(self.width - padding, self.height / 2)
+        elif side == Direction.DOWN:
+            position = Vector2(self.width / 2, self.height - padding)
+        else:
+            position = Vector2(padding, self.height / 2)
+        paddle = Paddle(size=paddle_size, side=side, position=position)
+        self._paddles[side] = paddle
+
+    def _init_paddles(self, sides):
+        sides = set(sides) if sides is not None else set()
+        for side in sides:
+            self.add_paddle(side)
 
     def update(self, delta_time: float):
+        self.updates += 1
+        self.time += delta_time
+        logger.debug(f"Update {self.updates} (time: {self.time})")
         self.ball.update(delta_time)
         for paddle in self.paddles:
             paddle.update(delta_time)
@@ -324,14 +385,22 @@ class Pong(Sized):
                     if direction.is_vertical:
                         subject.speed = Vector2(subject.speed.x, -subject.speed.y)
 
-
-    def move_paddle(self, paddle: int, direction: Direction | None):
-        assert direction is None or direction.is_vertical, "Direction must be vertical, if provided"
-        if direction is None:
-            self.paddles[paddle].speed = Vector2(0, 0)
+    def move_paddle(self, paddle: int | Direction, direction: Direction):
+        if isinstance(paddle, Direction) and paddle in self._paddles:
+            selected = self._paddles[paddle]
+        elif isinstance(paddle, int) and paddle in range(len(self.paddles)):
+            selected = self.paddles[0]
         else:
-            self.paddles[paddle].speed = direction.value * self.height * self.config.paddle_speed_ratio
+            raise KeyError("No such a paddle: " + str(paddle))
+        if selected.side.is_horizontal and direction.is_vertical:
+            selected.speed = direction.value * self.height * self.config.paddle_speed_ratio
+        elif selected.side.is_vertical and direction.is_horizontal:
+            selected.speed = direction.value * self.width * self.config.paddle_speed_ratio
+        elif direction == Direction.NONE:
+            selected.speed = direction.value
+        else:
+            logger.debug(f"Ignored attempt to move {paddle} in {direction}")
     
-    def stop_paddle(self, paddle: int):
-        self.move_paddle(paddle, None)
+    def stop_paddle(self, paddle: int | Direction):
+        self.move_paddle(paddle, Direction.NONE)
     

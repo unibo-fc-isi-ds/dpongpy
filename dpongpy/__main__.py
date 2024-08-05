@@ -1,4 +1,4 @@
-from dpongpy import main, Settings
+from dpongpy import PongGame, Settings
 
 settings = Settings()
-main(settings)
+PongGame(settings).run()
