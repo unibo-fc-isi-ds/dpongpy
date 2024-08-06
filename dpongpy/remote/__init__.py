@@ -34,6 +34,10 @@ class Address:
     def parse(cls, address: str):
         host, port = address.split(":")
         return cls(host, int(port))
+    
+    @classmethod
+    def local_port_on_any_interface(cls, port: int):
+        return cls("0.0.0.0", port)
 
     @classmethod
     def localhost(cls, port: int):
@@ -125,7 +129,7 @@ class Server:
     _session_class = Session
 
     def __init__(self, port: int):
-        self._address = Address.localhost(port)
+        self._address = Address.local_port_on_any_interface(port)
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._socket.bind(self._address.as_tuple())
 
