@@ -11,7 +11,7 @@ def rect(rectangle: Rectangle) -> pygame.Rect:
 
 class PongView(Protocol):
     def __init__(self, pong: Pong):
-        ...
+        pass
 
     def render(self):
         ...

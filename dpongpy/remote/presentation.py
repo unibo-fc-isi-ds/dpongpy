@@ -1,5 +1,6 @@
 from pygame.event import Event
 from dpongpy.model import *
+from dpongpy.controller import ControlEvent
 import json
 
 
@@ -46,9 +47,15 @@ class Serializer:
 
     def _serialize_direction(self, direction: Direction):
         return self._to_dict(direction, "name")
+    
+    def _serialize_controlevent(self, control_event: ControlEvent):
+        return self._to_dict(control_event, "name")
 
     def _serialize_event(self, event: Event):
-        return self._to_dict(event, "type", "dict")
+        obj = self._to_dict(event, "type", "dict")
+        if ControlEvent.is_control_event(event):
+            obj["event"] = self._serialize(ControlEvent.by_value(event.type))
+        return obj
 
     def _serialize_gameobject(self, obj: GameObject):
         return self._to_dict(obj, "position", "speed", "size", "name")
@@ -66,7 +73,7 @@ class Serializer:
         return self._to_dict(config, 'paddle_ratio', 'ball_ratio', 'ball_speed_ratio', 'paddle_speed_ratio', 'paddle_padding')
 
     def _serialize_pong(self, pong: Pong):
-        return self._to_dict(pong, 'paddles', 'ball', 'config', 'size')
+        return self._to_dict(pong, 'paddles', 'ball', 'config', 'size', 'time', 'updates')
 
 
 class Deserializer:
@@ -98,9 +105,15 @@ class Deserializer:
 
     def _deserialize_direction(self, obj):
         return Direction[obj["name"]]
+    
+    def _deserialize_controevent(self, obj):
+        return ControlEvent[obj["name"]]
 
     def _deserialize_event(self, obj):
-        return Event(*self._from_dict(obj, "type", "dict"))
+        fields = self._from_dict(obj, "type", "dict")
+        if isinstance(fields[0], ControlEvent):
+            fields[0] = fields[0].value
+        return Event(*fields)
 
     def _deserialize_rectangle(self, obj):
         return Rectangle(*self._from_dict(obj, "top_left", "bottom_right"))
@@ -118,6 +131,8 @@ class Deserializer:
         pong = Pong(*self._from_dict(obj, 'size', 'config'), paddles=[])
         pong.paddles = [self._deserialize(paddle) for paddle in obj['paddles']]
         pong.ball = self._deserialize(obj['ball'])
+        pong.time = self._deserialize(obj['time'])
+        pong.updates = self._deserialize(obj['updates'])
         return pong
 
 
@@ -136,6 +151,7 @@ def deserialize(input: str, deserializer=DEFAULT_DESERIALIZER):
 if __name__ == '__main__':
     _DEBUG = True
     pong = Pong(size=(800, 600))
+    pong.update(1.5)
     e = Event(1, {"state": pong})
     serialized = serialize(e)
     print(serialized)

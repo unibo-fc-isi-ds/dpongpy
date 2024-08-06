@@ -11,16 +11,7 @@ class PongInputHandler(InputHandler):
                 paddles_commands[paddle.side] = next(mappings)
         self._paddles_commands = paddles_commands
         assert len(self._pong.paddles) == len(self._paddles_commands), "Number of paddles and commands must match"
-
-    def post_event(self, event: pygame.event.Event | ControlEvent, **kwargs):
-        if isinstance(event, ControlEvent):
-            event = pygame.event.Event(event.value, **kwargs)
-        elif isinstance(event, pygame.event.Event) and event.dict != kwargs:
-            data = event.dict
-            data.update(kwargs)
-            event = pygame.event.Event(event.type, data)
-        pygame.event.post(event)
-
+    
     def _get_paddle_actions(self, key: int) -> dict[Direction, PlayerAction]:
         result = dict()
         for side, paddle_commands in self._paddles_commands.items():
@@ -41,9 +32,6 @@ class PongInputHandler(InputHandler):
             if action in {PlayerAction.MOVE_UP, PlayerAction.MOVE_DOWN}:
                 self.post_event(ControlEvent.PADDLE_MOVE, paddle_index=paddle_index, direction=Direction.NONE)
 
-    def time_elapsed(self, dt: float):
-        self.post_event(ControlEvent.TIME_ELAPSED, dt=dt)
-
     def handle_inputs(self, dt=None):
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
@@ -55,24 +43,6 @@ class PongInputHandler(InputHandler):
 
 
 class PongEventHandler(EventHandler):
-    def __init__(self, pong: Pong):
-        self._pong = pong
-
-    def handle_events(self):
-        for event in pygame.event.get():
-            if event.type == ControlEvent.PLAYER_JOIN.value:
-                self.on_player_join(self._pong, **event.dict)
-            elif event.type == ControlEvent.PLAYER_LEAVE.value:
-                self.on_player_leave(self._pong, **event.dict)
-            elif event.type == ControlEvent.GAME_START.value:
-                self.on_game_start(self._pong)
-            elif event.type == ControlEvent.GAME_OVER.value:
-                self.on_game_over(self._pong)
-            elif event.type == ControlEvent.PADDLE_MOVE.value:
-                self.on_paddle_move(self._pong, **event.dict)
-            elif event.type == ControlEvent.TIME_ELAPSED.value:
-                self.on_time_elapsed(self._pong, **event.dict)
-
     def on_player_join(self, pong: Pong, paddle_index: int | Direction):
         pong.add_paddle(paddle_index)
 

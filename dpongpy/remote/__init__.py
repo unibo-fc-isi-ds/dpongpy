@@ -1,9 +1,9 @@
 import socket
+from dpongpy.log import logger
 from dataclasses import dataclass, field
-from presentation import Presentation
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Address:
     host: str = field()
     port: int
@@ -56,6 +56,7 @@ def udp_socket(bind_to: Address | int = Address.any_local_port()) -> socket.sock
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     if bind_to is not None:
         sock.bind(bind_to.as_tuple())
+        logger.debug(f"Bind UDP socket to {sock.getsockname()}")
     return sock
 
 
@@ -64,14 +65,19 @@ def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
             payload = payload.encode()
         if len(payload) > THRESHOLD_DGRAM_SIZE:
             raise ValueError(f"Payload size must be less than {THRESHOLD_DGRAM_SIZE} bytes ({THRESHOLD_DGRAM_SIZE / 1024} KiB)")
-        return sock.sendto(payload, address.as_tuple())
+        result = sock.sendto(payload, address.as_tuple())
+        logger.debug(f"Sent {result} bytes to {address}: `{payload}`")
+        return result
 
 
 def udp_receive(sock: socket.socket, decode=True) -> tuple[str | bytes, Address]:
     payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+    size = len(payload)
     if decode:
         payload = payload.decode()
-    return payload, Address(*address)
+    address = Address(*address)
+    logger.debug(f"Received {size} bytes from {address}: `{payload}`")
+    return payload, address
 
 
 class Session:
@@ -105,12 +111,15 @@ class Session:
         #     self.remote_address = address
         assert address.equivalent_to(self.remote_address), f"Received packet from unexpected party {address}"
         return payload
+    
+    def close(self):
+        self._socket.close()
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._socket.close()
+        self.close()
 
 
 class Server:
@@ -139,6 +148,9 @@ class Server:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def close(self):
         self._socket.close()
 
 

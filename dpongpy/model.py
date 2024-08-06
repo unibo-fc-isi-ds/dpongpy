@@ -225,6 +225,12 @@ class GameObject(Sized, Positioned):
     def update(self, delta_time: float):
         self.position = self.position + self.speed * delta_time
 
+    def override(self, other: 'GameObject'):
+        assert isinstance(other, type(self)) and other.name == self.name, f"Invalid override: {other} -> {self}"
+        self.size = other.size
+        self.position = other.position
+        self.speed = other.speed
+
 
 for method_name in ['overlaps', 'is_inside', '__contains__', 'intersection_with', 'hits']:
     def method(self: GameObject, other: GameObject | Rectangle):
@@ -254,6 +260,10 @@ class Paddle(GameObject):
 
     def __eq__(self, other):
         return super().__eq__(other) and self.side == other.side
+    
+    def override(self, other: GameObject):
+        super().override(other)
+        self.side = other.side
 
 
 @dataclass
@@ -286,8 +296,7 @@ class Table(Sized):
 
 
 class Pong(Sized):
-
-    def __init__(self, size, config=None, paddles=(Direction.LEFT, Direction.RIGHT), random=None):
+    def __init__(self, size, config=None, paddles=None, random=None):
         self.size = Vector2(size)
         self.config = config or Config()
         self.random = random or Random()
@@ -296,6 +305,8 @@ class Pong(Sized):
         self.table = Table(self.size)
         self.updates = 0
         self.time = 0
+        if paddles is None:
+            paddles = (Direction.LEFT, Direction.RIGHT)
         self.paddles = [paddle for paddle in paddles if isinstance(paddle, Paddle)]
         self._init_paddles((side for side in paddles if isinstance(side, Direction)))
 
@@ -325,7 +336,7 @@ class Pong(Sized):
     def _hittable_objects(self) -> list[GameObject]:
         return self.paddles + list(self.table.borders.values())
 
-    def reset_ball(self):
+    def reset_ball(self, speed: Vector2 = None):
         min_dimension = min(*self.size)
         ball_size = Vector2(min_dimension * self.config.ball_ratio)
         if self.ball is None:
@@ -333,29 +344,50 @@ class Pong(Sized):
         else:
             self.ball.size = ball_size
             self.ball.position = self.size / 2
-        polar_speed = (min_dimension * self.config.ball_speed_ratio, self.random.uniform(0, 360))
-        self.ball.speed = Vector2.from_polar(polar_speed)
+        if speed is None:
+            polar_speed = (min_dimension * self.config.ball_speed_ratio, self.random.uniform(0, 360))
+            self.ball.speed = Vector2.from_polar(polar_speed)
+        else:
+            self.ball.speed = Vector2(speed)
 
-    def add_paddle(self, side: Direction.UP):
+    def add_paddle(self, side: Direction, paddle: Paddle = None):
         assert side is not None and side != Direction.NONE, "Invalid side"
         if side in self._paddles:
             raise ValueError(f"Paddle one side {side} already exists")
-        paddle_ratio = self.config.paddle_ratio
-        if side.is_vertical:
-            paddle_ratio = (paddle_ratio.y, paddle_ratio.x)
-        paddle_size = self.size.elementwise() * paddle_ratio
-        padding = self.width * self.config.paddle_padding + paddle_size.x / 2 if side.is_horizontal \
-            else self.height * self.config.paddle_padding + paddle_size.y / 2
-        if side == Direction.UP:
-            position = Vector2(self.width / 2, padding)
-        elif side == Direction.RIGHT:
-            position = Vector2(self.width - padding, self.height / 2)
-        elif side == Direction.DOWN:
-            position = Vector2(self.width / 2, self.height - padding)
-        else:
-            position = Vector2(padding, self.height / 2)
-        paddle = Paddle(size=paddle_size, side=side, position=position)
+        if paddle is None:
+            paddle_ratio = self.config.paddle_ratio
+            if side.is_vertical:
+                paddle_ratio = (paddle_ratio.y, paddle_ratio.x)
+            paddle_size = self.size.elementwise() * paddle_ratio
+            padding = self.width * self.config.paddle_padding + paddle_size.x / 2 if side.is_horizontal \
+                else self.height * self.config.paddle_padding + paddle_size.y / 2
+            if side == Direction.UP:
+                position = Vector2(self.width / 2, padding)
+            elif side == Direction.RIGHT:
+                position = Vector2(self.width - padding, self.height / 2)
+            elif side == Direction.DOWN:
+                position = Vector2(self.width / 2, self.height - padding)
+            else:
+                position = Vector2(padding, self.height / 2)
+            paddle = Paddle(size=paddle_size, side=side, position=position)
         self._paddles[side] = paddle
+        logger.debug(f"Added paddle {paddle} to {self} on side {paddle.side.name}")
+
+    def paddle(self, side: Direction):
+        if side in self._paddles:
+            return self._paddles[side]
+        else:
+            raise KeyError(f"No such a paddle: {side}")
+        
+    def has_paddle(self, side: Direction):
+        return side in self._paddles
+
+    def remove_paddle(self, side: Direction):
+        if side in self._paddles:
+            del self._paddles[side]
+            logger.debug(f"Removed paddle from {self} on side {side}")
+        else:
+            raise KeyError(f"No such a paddle: {side}")
 
     def _init_paddles(self, sides):
         sides = set(sides) if sides is not None else set()
@@ -403,4 +435,26 @@ class Pong(Sized):
     
     def stop_paddle(self, paddle: int | Direction):
         self.move_paddle(paddle, Direction.NONE)
-    
+
+    def override(self, other: 'Pong'):
+        self.size = other.size
+        self.config = other.config
+        self.ball.override(other.ball)
+        self.table = other.table
+        self.updates = other.updates
+        self.time = other.time
+        my_paddles = set((paddle.side for paddle in self.paddles))
+        other_paddles = set((paddle.side for paddle in other.paddles))
+        added = other_paddles - my_paddles
+        added = {p: other._paddles[p] for p in added}
+        removed = my_paddles - other_paddles
+        removed = {p: self._paddles[p] for p in removed}
+        common = my_paddles & other_paddles
+        common = {p: other._paddles[p] for p in common}
+        for side, paddle in added.items():
+            self.add_paddle(side, paddle)
+        for side, paddle in removed.items():
+            self.remove_paddle(side)
+        for side, paddle in common.items():
+            self.paddle(side).override(other.paddle(side))
+        return added, removed
