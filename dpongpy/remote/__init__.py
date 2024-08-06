@@ -61,22 +61,21 @@ def udp_socket(bind_to: Address | int = Address.any_local_port()) -> socket.sock
 
 
 def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
-        if isinstance(payload, str):
-            payload = payload.encode()
-        if len(payload) > THRESHOLD_DGRAM_SIZE:
-            raise ValueError(f"Payload size must be less than {THRESHOLD_DGRAM_SIZE} bytes ({THRESHOLD_DGRAM_SIZE / 1024} KiB)")
-        result = sock.sendto(payload, address.as_tuple())
-        logger.debug(f"Sent {result} bytes to {address}: `{payload}`")
-        return result
+    if isinstance(payload, str):
+        payload = payload.encode()
+    if len(payload) > THRESHOLD_DGRAM_SIZE:
+        raise ValueError(f"Payload size must be less than {THRESHOLD_DGRAM_SIZE} bytes ({THRESHOLD_DGRAM_SIZE / 1024} KiB)")
+    result = sock.sendto(payload, address.as_tuple())
+    logger.debug(f"Sent {result} bytes to {address}: {payload}")
+    return result
 
 
 def udp_receive(sock: socket.socket, decode=True) -> tuple[str | bytes, Address]:
     payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
-    size = len(payload)
+    address = Address(*address)
+    logger.debug(f"Received {len(payload)} bytes from {address}: {payload}")
     if decode:
         payload = payload.decode()
-    address = Address(*address)
-    logger.debug(f"Received {size} bytes from {address}: `{payload}`")
     return payload, address
 
 
@@ -89,7 +88,7 @@ class Session:
         self._socket = socket
         assert remote_address is not None, "Remote address must not be None"
         self.remote_address = Address(*remote_address) if isinstance(remote_address, tuple) else remote_address
-        # self._received_messages = 0 if first_message is None else 1
+        self._received_messages = 0 if first_message is None else 1
         self._first_message = first_message
 
     @property
@@ -107,8 +106,8 @@ class Session:
             self._first_message = None
             return payload
         payload, address = udp_receive(self._socket, decode)
-        # if self._received_messages == 0:
-        #     self.remote_address = address
+        if self._received_messages == 0:
+            self.remote_address = address
         assert address.equivalent_to(self.remote_address), f"Received packet from unexpected party {address}"
         return payload
     
