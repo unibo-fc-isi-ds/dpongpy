@@ -1,9 +1,9 @@
 from pygame.event import Event
-from dpongpy.controller import ControlEvent, Direction, Pong
 import pygame
 from dpongpy import PongGame, Settings
 from dpongpy.model import *
-from dpongpy.remote import Server, Client
+from dpongpy.controller import ControlEvent
+from dpongpy.remote.udp import Server, Client
 from dpongpy.remote.presentation import serialize, deserialize
 import threading
 
