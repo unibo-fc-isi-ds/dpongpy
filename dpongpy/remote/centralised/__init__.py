@@ -31,10 +31,8 @@ class PongCoordinator(PongGame):
 
         class SendToPeersPongView(ShowNothingPongView):
             def render(self):
-                event = coordinator.controller.create_event(ControlEvent.TIME_ELAPSED, dt=coordinator.dt, pong=coordinator.pong)
-                event = serialize(event)
-                for peer in coordinator.peers:
-                    coordinator.server.send(payload=event, address=peer)
+                event = coordinator.controller.create_event(ControlEvent.TIME_ELAPSED, dt=coordinator.dt, pong=self._pong)
+                coordinator._broadcast_to_all_peers(event)
 
         return SendToPeersPongView(coordinator.pong)
 
@@ -58,6 +56,8 @@ class PongCoordinator(PongGame):
                     pong.reset_ball()
 
             def on_game_over(self, pong: Pong):
+                event = self.create_event(ControlEvent.GAME_OVER)
+                coordinator._broadcast_to_all_peers(event)
                 coordinator.stop()
 
             def handle_inputs(self, dt=None):
@@ -65,12 +65,17 @@ class PongCoordinator(PongGame):
 
         return Controller(coordinator.pong)
 
+    def before_run(self):
+        logger.info("Coordinator starting")
+        super().before_run()
+
     def at_each_run(self):
         pass
 
     def after_run(self):
-        super().after_run()
         self.server.close()
+        logger.info("Coordinator stopped gracefully")
+        super().after_run()
 
     # def before_run(self):
     #     pass
@@ -89,13 +94,21 @@ class PongCoordinator(PongGame):
         with self._lock:
             self._peers.add(peer)
 
+    def _broadcast_to_all_peers(self, message):
+        event = serialize(message)
+        for peer in self.peers:
+            self.server.send(payload=event, address=peer)
+
     def _handle_ingoing_messages(self):
         while self.running:
             message, sender = self.server.receive()
-            self.add_peer(sender)
-            message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-            pygame.event.post(message)
+            if sender is not None:
+                self.add_peer(sender)
+                message = deserialize(message)
+                assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+                pygame.event.post(message)
+            elif self.running:
+                logger.warn(f"Receive operation returned None: the server may have been closed ahead of time")
 
 
 class PongTerminal(PongGame):
@@ -129,24 +142,37 @@ class PongTerminal(PongGame):
                 for event in pygame.event.get():
                     if ControlEvent.TIME_ELAPSED.matches(event):
                         pong = event.dict["pong"]
-                        terminal.pong.override(pong)
+                        self.on_time_elapsed(pong, dt=event.dict["dt"])
+                    if ControlEvent.GAME_OVER.matches(event):
+                        self.on_game_over(self._pong)
+
+            def on_time_elapsed(self, pong: Pong, dt: float):
+                terminal.pong.override(pong)
+
+            def on_game_over(self, pong: Pong):
+                terminal.stop()
         
         return Controller(terminal.pong)
     
     def _handle_ingoing_messages(self):
         if self.running:
             message = self.client.receive()
-            message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-            pygame.event.post(message)
+            if message is not None:
+                message = deserialize(message)
+                assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+                pygame.event.post(message)
+            elif self.running:
+                logger.warn(f"Receive operation returned None: the client may have been closed ahead of time")
 
     def before_run(self):
+        logger.info("Terminal starting")
         super().before_run()
         self.controller.post_event(ControlEvent.PLAYER_JOIN, paddle_index=self.settings.initial_paddles[0])
 
     def after_run(self):
+        self.client.close()
+        logger.info("Terminal stopped gracefully")
         super().after_run()
-        self.server.close()
 
 
 def main_coordinator(settings = None):
