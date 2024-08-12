@@ -54,7 +54,7 @@ class Serializer:
     def _serialize_event(self, event: Event):
         obj = self._to_dict(event, "type", "dict")
         if ControlEvent.is_control_event(event):
-            obj["event"] = self._serialize(ControlEvent.by_value(event.type))
+            obj["type"] = self._serialize(ControlEvent.by_value(event.type))
         return obj
 
     def _serialize_gameobject(self, obj: GameObject):
@@ -106,7 +106,7 @@ class Deserializer:
     def _deserialize_direction(self, obj):
         return Direction[obj["name"]]
     
-    def _deserialize_controevent(self, obj):
+    def _deserialize_controlevent(self, obj):
         return ControlEvent[obj["name"]]
 
     def _deserialize_event(self, obj):
