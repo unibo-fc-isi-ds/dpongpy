@@ -17,7 +17,7 @@ class ControlEvent(Enum):
         return set(cls.__members__.values())
 
     @classmethod
-    def is_control_event(cls, event: pygame.event.Event) -> set['ControlEvent']:
+    def is_control_event(cls, event: pygame.event.Event) -> bool:
         return any(event.type == control_event.value for control_event in cls.all())
     
     @classmethod
