@@ -99,8 +99,7 @@ class Session(Session):
 class Server(Server):
     def __init__(self, port: int):
         self._address = Address.local_port_on_any_interface(port)
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._socket.bind(self._address.as_tuple())
+        self._socket = udp_socket(self._address)
 
     def listen(self) -> Session:
         payload, address = udp_receive(self._socket, True)
