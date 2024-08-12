@@ -20,8 +20,8 @@ class PongCoordinator(PongGame):
         super().__init__(settings)
         self.pong.reset_ball((0, 0))
         self.server = Server(self.settings.port or DEFAULT_PORT)
-        self.thread = threading.Thread(target=self._handle_ingoing_messages, daemon=True)
-        self.thread.start()
+        self._thread_receiver = threading.Thread(target=self.__handle_ingoing_messages, daemon=True)
+        self._thread_receiver.start()
         self._peers = set()
         self._lock = threading.RLock()
 
@@ -99,7 +99,7 @@ class PongCoordinator(PongGame):
         for peer in self.peers:
             self.server.send(payload=event, address=peer)
 
-    def _handle_ingoing_messages(self):
+    def __handle_ingoing_messages(self):
         while self.running:
             message, sender = self.server.receive()
             if sender is not None:
