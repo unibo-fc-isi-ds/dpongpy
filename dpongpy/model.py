@@ -7,10 +7,10 @@ from enum import Enum
 
 class Direction(Enum):
     NONE = Vector2(0, 0)
-    UP = Vector2(0, -1)
-    DOWN = Vector2(0, 1)
     LEFT = Vector2(-1, 0)
+    UP = Vector2(0, -1)
     RIGHT = Vector2(1, 0)
+    DOWN = Vector2(0, 1)
 
     def __repr__(self):
         return f'<{type(self).__name__}.{self.name}>'
@@ -27,8 +27,8 @@ class Direction(Enum):
         return self.value.y == 0 and self.value.x != 0
 
     @classmethod
-    def values(cls) -> set['Direction']:
-        return set(cls.__members__.values())
+    def values(cls) -> list['Direction']:
+        return list(cls.__members__.values())
 
 
 # noinspection PyUnresolvedReferences
@@ -245,7 +245,7 @@ class Ball(GameObject):
 
 
 class Paddle(GameObject):
-    _admissible_directions = Direction.values() - {Direction.NONE}
+    _admissible_directions = set(Direction.values()) - {Direction.NONE}
 
     def __init__(self, size, side: Direction, position=None, speed=None, name=None):
         assert isinstance(side, Direction) and side in self._admissible_directions, f"Invalid direction {side}"
