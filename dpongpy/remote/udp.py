@@ -16,22 +16,36 @@ def udp_socket(bind_to: Address | int = Address.any_local_port()) -> socket.sock
 
 
 def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
-    if isinstance(payload, str):
-        payload = payload.encode()
-    if len(payload) > THRESHOLD_DGRAM_SIZE:
-        raise ValueError(f"Payload size must be less than {THRESHOLD_DGRAM_SIZE} bytes ({THRESHOLD_DGRAM_SIZE / 1024} KiB)")
-    result = sock.sendto(payload, address.as_tuple())
-    logger.debug(f"Sent {result} bytes to {address}: {payload}")
-    return result
+    try:
+        if sock._closed:
+            raise OSError("Socket is closed")
+        if isinstance(payload, str):
+            payload = payload.encode()
+        if len(payload) > THRESHOLD_DGRAM_SIZE:
+            raise ValueError(f"Payload size must be less than {THRESHOLD_DGRAM_SIZE} bytes ({THRESHOLD_DGRAM_SIZE / 1024} KiB)")
+        result = sock.sendto(payload, address.as_tuple())
+        logger.debug(f"Sent {result} bytes to {address}: {payload}")
+        return result
+    except OSError as e:
+        logger.error(e)
+        raise e
 
 
 def udp_receive(sock: socket.socket, decode=True) -> tuple[str | bytes, Address]:
-    payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
-    address = Address(*address)
-    logger.debug(f"Received {len(payload)} bytes from {address}: {payload}")
-    if decode:
-        payload = payload.decode()
-    return payload, address
+    try:
+        if sock._closed:
+            return None, None
+        payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+        address = Address(*address)
+        logger.debug(f"Received {len(payload)} bytes from {address}: {payload}")
+        if decode:
+            payload = payload.decode()
+        return payload, address
+    except OSError as e:
+        if sock._closed:
+            return None, None
+        logger.error(e)
+        raise e
 
 
 class Session(Session):
@@ -65,10 +79,12 @@ class Session(Session):
             self._first_message = None
             return payload
         payload, address = udp_receive(self._socket, decode)
-        if self._received_messages == 0:
-            self._remote_address = address
-        assert address.equivalent_to(self.remote_address), f"Received packet from unexpected party {address}"
-        return payload
+        if address is not None:
+            if self._received_messages == 0:
+                self._remote_address = address
+            assert address.equivalent_to(self.remote_address), f"Received packet from unexpected party {address}"
+            return payload
+        return None
     
     def close(self):
         self._socket.close()
