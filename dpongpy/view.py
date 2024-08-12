@@ -2,19 +2,19 @@ import pygame
 
 from .model import *
 from pygame import draw, Surface, Rect
-from typing import Iterable, Protocol
+from typing import Iterable
 
 
 def rect(rectangle: Rectangle) -> pygame.Rect:
     return pygame.Rect(rectangle.top_left, rectangle.size)
 
 
-class PongView(Protocol):
+class PongView:
     def __init__(self, pong: Pong):
-        pass
+        self._pong = pong
 
     def render(self):
-        ...
+        raise NotImplemented
 
 
 class ShowNothingPongView(PongView):
@@ -26,7 +26,7 @@ class ScreenPongView(PongView):
     debug_color = "green"
 
     def __init__(self, pong: Pong, screen: Surface = None, debug: bool = False):
-        self._pong = pong
+        super().__init__(pong)
         self._screen = screen or pygame.display.set_mode(pong.size)
         self._debug = debug
 
