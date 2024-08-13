@@ -17,8 +17,12 @@ class ControlEvent(Enum):
         return set(cls.__members__.values())
 
     @classmethod
+    def all_types(cls) -> set['ControlEvent']:
+        return {event.value for event in cls.all()}
+
+    @classmethod
     def is_control_event(cls, event: pygame.event.Event) -> bool:
-        return any(event.type == control_event.value for control_event in cls.all())
+        return any(control_event.matches(event) for control_event in cls.all())
     
     @classmethod
     def by_value(cls, value: int) -> 'ControlEvent':
@@ -105,6 +109,8 @@ def post_event(event: pygame.event.Event | ControlEvent, **kwargs):
 
 
 class InputHandler:
+    INPUT_EVENTS = (pygame.KEYDOWN, pygame.KEYUP)
+
     def create_event(self, event: pygame.event.Event | ControlEvent, **kwargs):
         return create_event(event, **kwargs)
 
@@ -112,24 +118,26 @@ class InputHandler:
         return post_event(event, **kwargs)
 
     def key_pressed(self, key: int):
-        ...
+        pass
 
     def key_released(self, key: int):
-        ...
+        pass
 
     def time_elapsed(self, dt: float):
         self.post_event(ControlEvent.TIME_ELAPSED, dt=dt)
 
     def handle_inputs(self, dt=None):
-        ...
+        pass
 
 
 class EventHandler:
+    GAME_EVENTS = tuple(ControlEvent.all_types())
+
     def __init__(self, pong: Pong):
         self._pong = pong
 
     def handle_events(self):
-        for event in pygame.event.get():
+        for event in pygame.event.get(self.GAME_EVENTS):
             if ControlEvent.PLAYER_JOIN.matches(event):
                 self.on_player_join(self._pong, **event.dict)
             elif ControlEvent.PLAYER_LEAVE.matches(event):
@@ -144,19 +152,19 @@ class EventHandler:
                 self.on_time_elapsed(self._pong, **event.dict)
 
     def on_player_join(self, pong: Pong, paddle_index: int | Direction):
-        ...
+        pass
 
     def on_player_leave(self, pong: Pong, paddle_index: int):
-        ...
+        pass
 
     def on_game_start(self, pong: Pong):
-        ...
+        pass
 
     def on_game_over(self, pong: Pong):
-        ...
+        pass
 
     def on_paddle_move(self, pong: Pong, paddle_index: int | Direction, direction: Direction):
-        ...
+        pass
 
     def on_time_elapsed(self, pong: Pong, dt: float):
-        ...
+        pass

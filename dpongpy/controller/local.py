@@ -33,7 +33,7 @@ class PongInputHandler(InputHandler):
                 self.post_event(ControlEvent.PADDLE_MOVE, paddle_index=paddle_index, direction=Direction.NONE)
 
     def handle_inputs(self, dt=None):
-        for event in pygame.event.get():
+        for event in pygame.event.get(self.INPUT_EVENTS):
             if event.type == pygame.KEYDOWN:
                 self.key_pressed(event.key)
             elif event.type == pygame.KEYUP:
