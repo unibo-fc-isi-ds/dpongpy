@@ -55,15 +55,17 @@ class PongGame:
         pygame.display.flip()
 
     def run(self):
-        self.dt = 0
-        self.before_run()
-        while self.running:
-            self.controller.handle_inputs(self.dt)
-            self.controller.handle_events()
-            self.view.render()
-            self.at_each_run()
-            self.dt = self.clock.tick(self.settings.fps) / 1000
-        self.after_run()
+        try:
+            self.dt = 0
+            self.before_run()
+            while self.running:
+                self.controller.handle_inputs(self.dt)
+                self.controller.handle_events()
+                self.view.render()
+                self.at_each_run()
+                self.dt = self.clock.tick(self.settings.fps) / 1000
+        finally:
+            self.after_run()
 
     def stop(self):
         self.running = False
