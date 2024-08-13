@@ -437,6 +437,9 @@ class Pong(Sized):
         self.move_paddle(paddle, Direction.NONE)
 
     def override(self, other: 'Pong'):
+        if self is other:
+            return
+        logger.debug(f"Overriding Pong status")
         self.size = other.size
         self.config = other.config
         self.ball.override(other.ball)
