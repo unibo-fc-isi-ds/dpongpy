@@ -1,8 +1,14 @@
 from dpongpy.log import logger
 from dpongpy.remote import *
+import os
+import random
 
 
 THRESHOLD_DGRAM_SIZE = 65536
+UDP_DROP_RATE = float(os.environ.get("UDP_DROP_RATE", 0.0))
+assert 0 <= UDP_DROP_RATE < 1, "Drop rate for outgoing UDP messages must be between 0 (included) and 1 (excluded)"
+if UDP_DROP_RATE > 0:
+    logger.warn(f"Drop rate for outgoing UDP messages is {UDP_DROP_RATE}")
 
 
 def udp_socket(bind_to: Address | int = Address.any_local_port()) -> socket.socket:
@@ -23,8 +29,12 @@ def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
             payload = payload.encode()
         if len(payload) > THRESHOLD_DGRAM_SIZE:
             raise ValueError(f"Payload size must be less than {THRESHOLD_DGRAM_SIZE} bytes ({THRESHOLD_DGRAM_SIZE / 1024} KiB)")
-        result = sock.sendto(payload, address.as_tuple())
-        logger.debug(f"Sent {result} bytes to {address}: {payload}")
+        if random.uniform(0, 1) < UDP_DROP_RATE:
+            result = len(payload)
+            logger.warn(f"Pretend to send {result} bytes to {address}: {payload}")
+        else:
+            result = sock.sendto(payload, address.as_tuple())
+            logger.debug(f"Sent {result} bytes to {address}: {payload}")
         return result
     except OSError as e:
         logger.error(e)
