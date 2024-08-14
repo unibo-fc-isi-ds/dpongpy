@@ -36,7 +36,7 @@ class PongCoordinator(PongGame):
 
         return SendToPeersPongView(coordinator.pong)
 
-    def create_controller(coordinator):
+    def create_controller(coordinator, paddle_commands):
         from dpongpy.controller.local import PongEventHandler, InputHandler
         
         class Controller(PongEventHandler, InputHandler):
@@ -122,12 +122,12 @@ class PongTerminal(PongGame):
         self._thread_receiver = threading.Thread(target=self.__handle_ingoing_messages, daemon=True)
         self._thread_receiver.start()
 
-    def create_controller(terminal):
+    def create_controller(terminal, paddle_commands = None):
         from dpongpy.controller.local import PongInputHandler, EventHandler
 
         class Controller(PongInputHandler, EventHandler):
-            def __init__(self, pong: Pong):
-                PongInputHandler.__init__(self, pong)
+            def __init__(self, pong: Pong, paddle_commands):
+                PongInputHandler.__init__(self, pong, paddle_commands)
 
             def post_event(self, event: Event | ControlEvent, **kwargs):
                 event = super().post_event(event, **kwargs)
@@ -150,7 +150,7 @@ class PongTerminal(PongGame):
             def on_game_over(self, pong: Pong):
                 terminal.stop()
         
-        return Controller(terminal.pong)
+        return Controller(terminal.pong, paddle_commands)
     
     def __handle_ingoing_messages(self):
         while self.running:
@@ -165,7 +165,7 @@ class PongTerminal(PongGame):
     def before_run(self):
         logger.info("Terminal starting")
         super().before_run()
-        self.controller.post_event(ControlEvent.PLAYER_JOIN, paddle_index=self.settings.initial_paddles[0])
+        self.controller.post_event(ControlEvent.PLAYER_JOIN, paddle_index=self.pong.paddles[0].side)
 
     def after_run(self):
         self.client.close()

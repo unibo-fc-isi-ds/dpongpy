@@ -49,6 +49,14 @@ class PlayerAction(Enum):
     STOP = 4
     QUIT = 5
 
+    @classmethod
+    def all(cls) -> set['PlayerAction']:
+        return set(cls.__members__.values())
+
+    @classmethod
+    def all_moves(cls) -> set['PlayerAction']:
+        return {action for action in cls.all() if 'MOVE_' in action.name}
+
     def to_direction(self):
         if 'MOVE_' in self.name:
             return Direction[self.name.split('_')[1]]
@@ -64,32 +72,33 @@ class ActionMap:
     move_left: int
     move_right: int
     quit: int = pygame.K_ESCAPE
+    name: str = 'custom'
 
     def to_key_map(self):
-        return {getattr(self, name): PlayerAction[name.upper()] for name in self.__annotations__}
+        return {getattr(self, name): PlayerAction[name.upper()] for name in self.__annotations__ if name != 'name'}
 
     @classmethod
     def wasd(cls):
-        return cls(pygame.K_w, pygame.K_s, pygame.K_a, pygame.K_d)
+        return cls(pygame.K_w, pygame.K_s, pygame.K_a, pygame.K_d, name='wasd')
 
     @classmethod
     def ijkl(cls):
-        return cls(pygame.K_i, pygame.K_k, pygame.K_j, pygame.K_l)
+        return cls(pygame.K_i, pygame.K_k, pygame.K_j, pygame.K_l, name='ijkl')
 
     @classmethod
     def numpad(cls):
-        return cls(pygame.K_KP8, pygame.K_KP2, pygame.K_KP4, pygame.K_KP6)
+        return cls(pygame.K_KP8, pygame.K_KP2, pygame.K_KP4, pygame.K_KP6, name='numpad')
 
     @classmethod
-    def arrow_keys(cls):
-        return cls(pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT)
+    def arrows(cls):
+        return cls(pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT, name='arrows')
 
     @classmethod
-    def all_mappings(cls):
-        yield cls.wasd()
-        yield cls.arrow_keys()
-        yield cls.ijkl()
-        yield cls.numpad()
+    def all_mappings(cls, list=False):
+        mappings = [cls.wasd(), cls.arrows(), cls.ijkl(), cls.numpad()]
+        if list:
+            return mappings
+        return {mapping.name: mapping for mapping in mappings}
 
 
 def create_event(event: pygame.event.Event | ControlEvent, **kwargs):

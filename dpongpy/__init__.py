@@ -1,5 +1,5 @@
 from dpongpy.model import Pong, Config, Direction
-from dpongpy.controller.local import PongLocalController as PongController
+from dpongpy.controller.local import ActionMap, PongLocalController as PongController
 import pygame
 from dataclasses import dataclass, field
 
@@ -27,23 +27,23 @@ class PongGame:
         self.view = self.create_view()
         self.clock = pygame.time.Clock()
         self.running = True
-        self.controller = self.create_controller()
+        self.controller = self.create_controller(settings.initial_paddles)
 
     def create_view(self):
         from dpongpy.view import ScreenPongView
         return ScreenPongView(self.pong, debug=self.settings.debug)
 
-    def create_controller(game):
+    def create_controller(game, paddle_commands: dict[Direction, ActionMap]):
         from dpongpy.controller.local import PongLocalController
 
         class Controller(PongLocalController):
-            def __init__(self):
-                super().__init__(game.pong)
+            def __init__(self, paddle_commands):
+                super().__init__(game.pong, paddle_commands)
 
             def on_game_over(this, _):
                 game.stop()
 
-        return Controller()
+        return Controller(paddle_commands)
 
     def before_run(self):
         pygame.init()

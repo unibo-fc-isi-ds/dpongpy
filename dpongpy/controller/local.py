@@ -6,11 +6,16 @@ class PongInputHandler(InputHandler):
         self._pong = pong
         if paddles_commands is None:
             paddles_commands = dict()
-            mappings = iter(ActionMap.all_mappings())
-            for paddle in pong.paddles:
-                paddles_commands[paddle.side] = next(mappings)
+            sides = [paddle.side for paddle in pong.paddles]
+            sides.sort(key=lambda side: Direction.values().index(side))
+            commands = ActionMap.all_mappings(list=True)
+            for side, command in zip(sides, commands):
+                paddles_commands[side] = command
         self._paddles_commands = paddles_commands
         assert len(self._pong.paddles) == len(self._paddles_commands), "Number of paddles and commands must match"
+        for side, keymap in self._paddles_commands.items():
+            logger.info(f"Player {side.name} controls: {keymap.name}")
+
     
     def _get_paddle_actions(self, key: int) -> dict[Direction, PlayerAction]:
         result = dict()
@@ -22,14 +27,14 @@ class PongInputHandler(InputHandler):
 
     def key_pressed(self, key: int):
         for paddle_index, action in self._get_paddle_actions(key).items():
-            if action in {PlayerAction.MOVE_UP, PlayerAction.MOVE_DOWN}:
+            if action in PlayerAction.all_moves():
                 self.post_event(ControlEvent.PADDLE_MOVE, paddle_index=paddle_index, direction=action.to_direction())
             elif action == PlayerAction.QUIT:
                 self.post_event(ControlEvent.PLAYER_LEAVE, paddle_index=paddle_index)
 
     def key_released(self, key: int):
         for paddle_index, action in self._get_paddle_actions(key).items():
-            if action in {PlayerAction.MOVE_UP, PlayerAction.MOVE_DOWN}:
+            if action in PlayerAction.all_moves():
                 self.post_event(ControlEvent.PADDLE_MOVE, paddle_index=paddle_index, direction=Direction.NONE)
 
     def handle_inputs(self, dt=None):
@@ -63,6 +68,6 @@ class PongEventHandler(EventHandler):
 
 
 class PongLocalController(PongInputHandler, PongEventHandler):
-    def __init__(self, pong: Pong, paddles_commands: list[ActionMap] = None):
+    def __init__(self, pong: Pong, paddles_commands: dict[Direction, ActionMap] = None):
         PongInputHandler.__init__(self, pong, paddles_commands)
         PongEventHandler.__init__(self, pong)
