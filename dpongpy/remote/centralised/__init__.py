@@ -100,15 +100,23 @@ class PongCoordinator(PongGame):
             self.server.send(payload=event, address=peer)
 
     def __handle_ingoing_messages(self):
-        while self.running:
-            message, sender = self.server.receive()
-            if sender is not None:
-                self.add_peer(sender)
-                message = deserialize(message)
-                assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-                pygame.event.post(message)
-            elif self.running:
-                logger.warn(f"Receive operation returned None: the server may have been closed ahead of time")
+        try:
+            max_retries = 3
+            while self.running:
+                message, sender = self.server.receive()
+                if sender is not None:
+                    self.add_peer(sender)
+                    message = deserialize(message)
+                    assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+                    pygame.event.post(message)
+                elif self.running:
+                    logger.warn(f"Receive operation returned None: the server may have been closed ahead of time")
+                    max_retries -= 1
+                    if max_retries == 0: break
+        except Exception as e:
+            self.running = False
+            raise e
+
 
 
 class PongTerminal(PongGame):
@@ -153,14 +161,21 @@ class PongTerminal(PongGame):
         return Controller(terminal.pong, paddle_commands)
     
     def __handle_ingoing_messages(self):
-        while self.running:
-            message = self.client.receive()
-            if message is not None:
-                message = deserialize(message)
-                assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-                pygame.event.post(message)
-            elif self.running:
-                logger.warn(f"Receive operation returned None: the client may have been closed ahead of time")
+        try:
+            max_retries = 3
+            while self.running:
+                message = self.client.receive()
+                if message is not None:
+                    message = deserialize(message)
+                    assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+                    pygame.event.post(message)
+                elif self.running:
+                    logger.warn(f"Receive operation returned None: the client may have been closed ahead of time")
+                    max_retries -= 1
+                    if max_retries == 0: break
+        except Exception as e:
+            self.running = False
+            raise e
 
     def before_run(self):
         logger.info("Terminal starting")
