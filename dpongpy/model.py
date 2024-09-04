@@ -294,7 +294,6 @@ class Table(Sized):
                 name=f"border_{dir.name.lower()}"
             )
 
-
 class Pong(Sized):
     def __init__(self, size, config=None, paddles=None, random=None):
         self.size = Vector2(size)

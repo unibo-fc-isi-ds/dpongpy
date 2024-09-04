@@ -1,21 +1,31 @@
 from dpongpy.controller import *
+from typing import Iterable
+
+
+def _normalize_commands(
+        pong: Pong,
+        paddles: dict[Direction, ActionMap] | Iterable[Direction] | None
+    ) -> dict[Direction, ActionMap]:
+    if paddles is dict:
+        assert set(paddles.keys()) == {p.side for p in pong.paddles}, "All paddles must come with an ActionMap"
+        return paddles
+    if paddles is None:
+        sides = [paddle.side for paddle in pong.paddles]
+    else:
+        assert set(paddles) == {p.side for p in pong.paddles}, "Paddles in pong must match paddles in commands"
+        sides = list(paddles)
+    sides.sort(key=lambda side: Direction.values().index(side))
+    commands = ActionMap.all_mappings(list=True)
+    return {side: command for side, command in zip(sides, commands)}
 
 
 class PongInputHandler(InputHandler):
     def __init__(self, pong: Pong, paddles_commands: dict[Direction, ActionMap] = None):
         self._pong = pong
-        if paddles_commands is None:
-            paddles_commands = dict()
-            sides = [paddle.side for paddle in pong.paddles]
-            sides.sort(key=lambda side: Direction.values().index(side))
-            commands = ActionMap.all_mappings(list=True)
-            for side, command in zip(sides, commands):
-                paddles_commands[side] = command
-        self._paddles_commands = paddles_commands
+        self._paddles_commands = _normalize_commands(pong, paddles_commands)
         assert len(self._pong.paddles) == len(self._paddles_commands), "Number of paddles and commands must match"
         for side, keymap in self._paddles_commands.items():
             logger.info(f"Player {side.name} controls: {keymap.name}")
-
     
     def _get_paddle_actions(self, key: int) -> dict[Direction, PlayerAction]:
         result = dict()
