@@ -101,7 +101,7 @@ class TestRectangle(unittest.TestCase):
             with self.subTest(rect=f'in position {i}, {j}', doesnt_overlap='other'):
                 self.assertFalse(self.rectangles[(i, j)].overlaps(self.other))
     
-    def test_border_is_overlap(self):
+    def test_wall_is_overlap(self):
         for i, j in self.indexes(include_center=False):
             for y, x in self.indexes(include_center=False):
                 if abs(i - y) + abs(j - x) == 1:
@@ -297,17 +297,17 @@ class TestPong(unittest.TestCase):
             with self.subTest(obj=f'paddle {i}', initial_pos=initial_positions['paddles'][i], speed=speeds['paddles'][i]):
                 self.assertEqual(paddle.position, initial_positions['paddles'][i] + dt * speeds['paddles'][i])
 
-    def test_hit_top_border(self):
+    def test_hit_top_wall(self):
         ball = self.pong.ball
         ball.position = Vector2(self.size.x / 2, 1)
-        border = self.pong.table.borders[Direction.UP]
-        self.assertEqual(ball.hits(border), {Direction.UP: 1.25})
+        wall = self.pong.board.walls[Direction.UP]
+        self.assertEqual(ball.hits(wall), {Direction.UP: 1.25})
 
-    def test_hit_bottom_border(self):
+    def test_hit_bottom_wall(self):
         ball = self.pong.ball
         ball.position = Vector2(self.size.x / 2, self.size.y - 1)
-        border = self.pong.table.borders[Direction.DOWN]
-        self.assertEqual(ball.hits(border), {Direction.DOWN: 1.25})
+        wall = self.pong.board.walls[Direction.DOWN]
+        self.assertEqual(ball.hits(wall), {Direction.DOWN: 1.25})
 
     def test_hit_left_paddle(self):
         ball = self.pong.ball
@@ -337,10 +337,10 @@ class TestPong(unittest.TestCase):
             self.assertLess(i, max_rounds)
             self.assertNotEqual(self.pong.ball.speed, direction.value)
 
-    def test_collision_with_top_border(self):
+    def test_collision_with_top_wall(self):
         self._test_collisions(Direction.UP)
 
-    def test_collision_with_bottom_border(self):
+    def test_collision_with_bottom_wall(self):
         self._test_collisions(Direction.DOWN)
 
     def test_collision_with_left_paddle(self):

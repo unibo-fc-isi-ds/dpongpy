@@ -276,22 +276,22 @@ class Config:
 
 
 @dataclass
-class Table(Sized):
+class Board(Sized):
     size: Vector2
-    borders: dict[Direction, GameObject] = field(init=False)
+    walls: dict[Direction, GameObject] = field(init=False)
 
     def __post_init__(self):
-        borders = dict()
-        borders[Direction.UP] = Rectangle((-self.width, 0), (self.width * 2, -self.height))
-        borders[Direction.DOWN] = Rectangle((-self.width, self.height), (self.width * 2, self.height * 2))
-        borders[Direction.LEFT] = Rectangle((0, -self.height), (-self.width, self.height * 2))
-        borders[Direction.RIGHT] = Rectangle((self.width, -self.height), (self.width * 2, self.height * 2))
-        self.borders = dict()
-        for dir, rect in borders.items():
-            self.borders[dir] = GameObject(
+        walls = dict()
+        walls[Direction.UP] = Rectangle((-self.width, 0), (self.width * 2, -self.height))
+        walls[Direction.DOWN] = Rectangle((-self.width, self.height), (self.width * 2, self.height * 2))
+        walls[Direction.LEFT] = Rectangle((0, -self.height), (-self.width, self.height * 2))
+        walls[Direction.RIGHT] = Rectangle((self.width, -self.height), (self.width * 2, self.height * 2))
+        self.walls = dict()
+        for dir, rect in walls.items():
+            self.walls[dir] = GameObject(
                 size=rect.size,
                 position=rect.position,
-                name=f"border_{dir.name.lower()}"
+                name=f"wall_{dir.name.lower()}"
             )
 
 class Pong(Sized):
@@ -301,7 +301,7 @@ class Pong(Sized):
         self.random = random or Random()
         self.ball = None
         self.reset_ball()
-        self.table = Table(self.size)
+        self.board = Board(self.size)
         self.updates = 0
         self.time = 0
         if paddles is None:
@@ -333,7 +333,7 @@ class Pong(Sized):
 
     @property
     def _hittable_objects(self) -> list[GameObject]:
-        return self.paddles + list(self.table.borders.values())
+        return self.paddles + list(self.board.walls.values())
 
     def reset_ball(self, speed: Vector2 = None):
         min_dimension = min(*self.size)
@@ -402,7 +402,7 @@ class Pong(Sized):
             paddle.update(delta_time)
         self._handle_collisions(self.ball, self._hittable_objects)
         for paddle in self.paddles:
-            self._handle_collisions(paddle, self.table.borders.values())
+            self._handle_collisions(paddle, self.board.walls.values())
 
     def _handle_collisions(self, subject, objects):
         for hittable in objects:
@@ -442,7 +442,7 @@ class Pong(Sized):
         self.size = other.size
         self.config = other.config
         self.ball.override(other.ball)
-        self.table = other.table
+        self.board = other.board
         self.updates = other.updates
         self.time = other.time
         my_paddles = set((paddle.side for paddle in self.paddles))
