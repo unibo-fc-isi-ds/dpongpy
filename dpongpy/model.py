@@ -3,6 +3,7 @@ from .log import logger
 from dataclasses import dataclass, field
 from random import Random
 from enum import Enum
+from typing import Optional
 
 
 class Direction(Enum):
@@ -31,28 +32,26 @@ class Direction(Enum):
         return list(cls.__members__.values())
 
 
-# noinspection PyUnresolvedReferences
 class Sized:
 
     @property
     def width(self) -> float:
-        return self.size.x
+        return self.size.x # type: ignore[attr-defined]
 
     @property
     def height(self) -> float:
-        return self.size.y
+        return self.size.y # type: ignore[attr-defined]
 
 
-# noinspection PyUnresolvedReferences
 class Positioned:
 
     @property
     def x(self) -> float:
-        return self.position.x
+        return self.position.x # type: ignore[attr-defined]
 
     @property
     def y(self) -> float:
-        return self.position.y
+        return self.position.y # type: ignore[attr-defined]
 
 
 @dataclass
@@ -117,7 +116,7 @@ class Rectangle(Sized, Positioned):
             x, y = other
             return self.left <= x <= self.right and self.top <= y <= self.bottom
 
-    def intersection_with(self, other: 'Rectangle') -> 'Rectangle':
+    def intersection_with(self, other: 'Rectangle') -> Optional['Rectangle']:
         if self.overlaps(other):
             return Rectangle(
                 Vector2(
@@ -263,7 +262,7 @@ class Paddle(GameObject):
 
     def override(self, other: GameObject):
         super().override(other)
-        self.side = other.side
+        self.side = other.side # type: ignore[attr-defined]
 
 
 @dataclass
@@ -315,6 +314,13 @@ class Pong(Sized):
         result.sort(key=lambda p: -p.side.value.as_polar()[1]) # sort by angle (anticlockwise, starting from left)
         return result
 
+    @paddles.setter
+    def paddles(self, paddles):
+        self._paddles = {}
+        for paddle in paddles:
+            assert isinstance(paddle, Paddle), f"Invalid paddle: {paddle}"
+            self._paddles[paddle.side] = paddle
+
     def __repr__(self):
         return (f'<{type(self).__name__}('
                 f'id={id(self)}, '
@@ -325,13 +331,6 @@ class Pong(Sized):
                 f'ball={repr(self.ball)}, '
                 f'paddles={self.paddles}, '
                 f')>')
-
-    @paddles.setter
-    def paddles(self, paddles):
-        self._paddles = {}
-        for paddle in paddles:
-            assert isinstance(paddle, Paddle), f"Invalid paddle: {paddle}"
-            self._paddles[paddle.side] = paddle
 
     @property
     def _hittable_objects(self) -> list[GameObject]:

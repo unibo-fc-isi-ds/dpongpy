@@ -34,7 +34,7 @@ class Address:
     def parse(cls, address: str):
         host, port = address.split(":")
         return cls(host, int(port))
-    
+
     @classmethod
     def local_port_on_any_interface(cls, port: int):
         return cls("0.0.0.0", port)
@@ -66,7 +66,7 @@ class Session(Protocol):
 
     def receive(self, decode=True):
         ...
-    
+
     def close(self):
         ...
 
@@ -84,7 +84,7 @@ class Server(Protocol):
     def listen(self) -> Session:
         ...
 
-    def receive(self, decode=True) -> tuple[str | bytes, Address]:
+    def receive(self, decode=True) -> tuple[str | bytes | None, Address | None]:
         ...
 
     def send(self, address: Address, payload: bytes | str):

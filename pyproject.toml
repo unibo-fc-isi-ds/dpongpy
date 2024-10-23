@@ -41,3 +41,5 @@ priority = "primary"
 
 [tool.mypy]
 ignore_missing_imports = true
+implicit_optional = true
+allow_redefinition = true

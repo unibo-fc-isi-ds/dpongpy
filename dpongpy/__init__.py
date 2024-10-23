@@ -2,6 +2,7 @@ from dpongpy.model import Pong, Config, Direction
 from dpongpy.controller.local import ActionMap, PongLocalController as PongController
 import pygame
 from dataclasses import dataclass, field
+from typing import Optional, Collection, Iterable
 
 
 @dataclass
@@ -10,16 +11,16 @@ class Settings:
     debug: bool = False
     size: tuple = (800, 600)
     fps: int = 60
-    host: str = None
-    port: int = None
-    initial_paddles: tuple[Direction] = (Direction.LEFT, Direction.RIGHT)
+    host: Optional[str] = None
+    port: Optional[int] = None
+    initial_paddles: Collection[Direction] = (Direction.LEFT, Direction.RIGHT)
 
 
 class PongGame:
     def __init__(self, settings: Settings = None):
         self.settings = settings or Settings()
         self.pong = Pong(
-            size=self.settings.size, 
+            size=self.settings.size,
             config=self.settings.config,
             paddles=self.settings.initial_paddles
         )
@@ -27,13 +28,13 @@ class PongGame:
         self.view = self.create_view()
         self.clock = pygame.time.Clock()
         self.running = True
-        self.controller = self.create_controller(settings.initial_paddles)
+        self.controller = self.create_controller(self.settings.initial_paddles)
 
     def create_view(self):
         from dpongpy.view import ScreenPongView
         return ScreenPongView(self.pong, debug=self.settings.debug)
 
-    def create_controller(game, paddle_commands: dict[Direction, ActionMap]):
+    def create_controller(game, paddle_commands: dict[Direction, ActionMap] | Iterable[Direction]):
         from dpongpy.controller.local import PongLocalController
 
         class Controller(PongLocalController):

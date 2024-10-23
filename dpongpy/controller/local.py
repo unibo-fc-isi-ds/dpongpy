@@ -6,7 +6,7 @@ def _normalize_commands(
         pong: Pong,
         paddles: dict[Direction, ActionMap] | Iterable[Direction] | None
     ) -> dict[Direction, ActionMap]:
-    if paddles is dict:
+    if isinstance(paddles, dict):
         assert set(paddles.keys()) == {p.side for p in pong.paddles}, "All paddles must come with an ActionMap"
         return paddles
     if paddles is None:
@@ -26,7 +26,7 @@ class PongInputHandler(InputHandler):
         assert len(self._pong.paddles) == len(self._paddles_commands), "Number of paddles and commands must match"
         for side, keymap in self._paddles_commands.items():
             logger.info(f"Player {side.name} controls: {keymap.name}")
-    
+
     def _get_paddle_actions(self, key: int) -> dict[Direction, PlayerAction]:
         result = dict()
         for side, paddle_commands in self._paddles_commands.items():
@@ -58,10 +58,10 @@ class PongInputHandler(InputHandler):
 
 
 class PongEventHandler(EventHandler):
-    def on_player_join(self, pong: Pong, paddle_index: int | Direction):
+    def on_player_join(self, pong: Pong, paddle_index: Direction):
         pong.add_paddle(paddle_index)
 
-    def on_player_leave(self, pong: Pong, paddle_index: int):
+    def on_player_leave(self, pong: Pong, paddle_index: Direction):
         self.on_game_over(pong)
 
     def on_game_start(self, pong: Pong):
@@ -70,7 +70,7 @@ class PongEventHandler(EventHandler):
     def on_game_over(self, pong: Pong):
         pass
 
-    def on_paddle_move(self, pong: Pong, paddle_index: int | Direction, direction: Direction):
+    def on_paddle_move(self, pong: Pong, paddle_index: Direction, direction: Direction):
         pong.move_paddle(paddle_index, direction)
 
     def on_time_elapsed(self, pong: Pong, dt: float):

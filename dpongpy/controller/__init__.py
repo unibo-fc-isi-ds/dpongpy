@@ -17,20 +17,20 @@ class ControlEvent(Enum):
         return set(cls.__members__.values())
 
     @classmethod
-    def all_types(cls) -> set['ControlEvent']:
+    def all_types(cls) -> set[int]:
         return {event.value for event in cls.all()}
 
     @classmethod
     def is_control_event(cls, event: pygame.event.Event) -> bool:
         return any(control_event.matches(event) for control_event in cls.all())
-    
+
     @classmethod
     def by_value(cls, value: int) -> 'ControlEvent':
         for control_event in cls.all():
             if control_event.value == value:
                 return control_event
         raise KeyError(f"{cls.__name__} with value {value} not found")
-    
+
     def matches(self, event) -> bool:
         if isinstance(event, pygame.event.Event):
             return event.type == self.value
@@ -112,7 +112,7 @@ def create_event(event: pygame.event.Event | ControlEvent, **kwargs):
 
 
 def post_event(event: pygame.event.Event | ControlEvent, **kwargs):
-    event = create_event(event, **kwargs)    
+    event = create_event(event, **kwargs)
     pygame.event.post(event)
     return event
 
@@ -160,10 +160,10 @@ class EventHandler:
             elif ControlEvent.TIME_ELAPSED.matches(event):
                 self.on_time_elapsed(self._pong, **event.dict)
 
-    def on_player_join(self, pong: Pong, paddle_index: int | Direction):
+    def on_player_join(self, pong: Pong, paddle_index: Direction):
         pass
 
-    def on_player_leave(self, pong: Pong, paddle_index: int):
+    def on_player_leave(self, pong: Pong, paddle_index: Direction):
         pass
 
     def on_game_start(self, pong: Pong):
@@ -172,7 +172,7 @@ class EventHandler:
     def on_game_over(self, pong: Pong):
         pass
 
-    def on_paddle_move(self, pong: Pong, paddle_index: int | Direction, direction: Direction):
+    def on_paddle_move(self, pong: Pong, paddle_index: Direction, direction: Direction):
         pass
 
     def on_time_elapsed(self, pong: Pong, dt: float):

@@ -3,7 +3,7 @@ import pygame
 from dpongpy import PongGame, Settings
 from dpongpy.model import *
 from dpongpy.controller import ControlEvent
-from dpongpy.remote.udp import Server, Client
+from dpongpy.remote.udp import UdpClient, UdpServer, Address
 from dpongpy.remote.presentation import serialize, deserialize
 import threading
 
@@ -18,11 +18,11 @@ class PongCoordinator(PongGame):
         settings = settings or Settings()
         settings.initial_paddles = []
         super().__init__(settings)
-        self.pong.reset_ball((0, 0))
-        self.server = Server(self.settings.port or DEFAULT_PORT)
+        self.pong.reset_ball(Vector2(0))
+        self.server = UdpServer(self.settings.port or DEFAULT_PORT)
         self._thread_receiver = threading.Thread(target=self.__handle_ingoing_messages, daemon=True)
         self._thread_receiver.start()
-        self._peers = set()
+        self._peers: set[Address] = set()
         self._lock = threading.RLock()
 
     def create_view(coordinator):
@@ -38,12 +38,12 @@ class PongCoordinator(PongGame):
 
     def create_controller(coordinator, paddle_commands):
         from dpongpy.controller.local import PongEventHandler, InputHandler
-        
+
         class Controller(PongEventHandler, InputHandler):
             def __init__(self, pong: Pong):
                 PongEventHandler.__init__(self, pong)
 
-            def on_player_join(self, pong: Pong, paddle_index: int | Direction):
+            def on_player_join(self, pong: Pong, paddle_index: Direction):
                 super().on_player_join(pong, paddle_index)
                 pong.reset_ball()
 
@@ -84,7 +84,7 @@ class PongCoordinator(PongGame):
     def peers(self):
         with self._lock:
             return set(self._peers)
-    
+
     @peers.setter
     def peers(self, value):
         with self._lock:
@@ -125,8 +125,8 @@ class PongTerminal(PongGame):
         settings = settings or Settings()
         assert len(settings.initial_paddles) == 1, "Only one paddle is allowed in terminal mode"
         super().__init__(settings)
-        self.pong.reset_ball((0, 0))
-        self.client = Client((self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
+        self.pong.reset_ball(Vector2(0))
+        self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
         self._thread_receiver = threading.Thread(target=self.__handle_ingoing_messages, daemon=True)
         self._thread_receiver.start()
 
@@ -157,9 +157,9 @@ class PongTerminal(PongGame):
 
             def on_game_over(self, pong: Pong):
                 terminal.stop()
-        
+
         return Controller(terminal.pong, paddle_commands)
-    
+
     def __handle_ingoing_messages(self):
         try:
             max_retries = 3
