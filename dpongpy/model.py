@@ -308,6 +308,18 @@ class Pong(Sized):
         self.paddles = [paddle for paddle in paddles if isinstance(paddle, Paddle)]
         self._init_paddles((side for side in paddles if isinstance(side, Direction)))
 
+    def __eq__(self, value):
+        return isinstance(value, Pong) and \
+            self.size == value.size and \
+            self.config == value.config and \
+            self.ball == value.ball and \
+            self.paddles == value.paddles and \
+            self.updates == value.updates and \
+            self.time == value.time
+
+    def __hash__(self):
+        return hash((self.size, self.config, self.ball, tuple(self.paddles), self.updates, self.time))
+
     @property
     def paddles(self) -> list[Paddle]:
         result = list(self._paddles.values())

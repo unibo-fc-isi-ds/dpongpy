@@ -1,0 +1,95 @@
+{
+    "type": 1,
+    "dict": {
+        "state": {
+            "paddles": [
+                {
+                    "position": {
+                        "x": 44.0,
+                        "y": 300.0,
+                        "$type": "Vector2"
+                    },
+                    "speed": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "$type": "Vector2"
+                    },
+                    "size": {
+                        "x": 8.0,
+                        "y": 60.0,
+                        "$type": "Vector2"
+                    },
+                    "name": "paddle_left",
+                    "side": {
+                        "name": "LEFT",
+                        "$type": "Direction"
+                    },
+                    "$type": "Paddle"
+                },
+                {
+                    "position": {
+                        "x": 756.0,
+                        "y": 300.0,
+                        "$type": "Vector2"
+                    },
+                    "speed": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "$type": "Vector2"
+                    },
+                    "size": {
+                        "x": 8.0,
+                        "y": 60.0,
+                        "$type": "Vector2"
+                    },
+                    "name": "paddle_right",
+                    "side": {
+                        "name": "RIGHT",
+                        "$type": "Direction"
+                    },
+                    "$type": "Paddle"
+                }
+            ],
+            "ball": {
+                "position": {
+                    "x": 401.5,
+                    "y": 301.5,
+                    "$type": "Vector2"
+                },
+                "speed": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "$type": "Vector2"
+                },
+                "size": {
+                    "x": 30.0,
+                    "y": 30.0,
+                    "$type": "Vector2"
+                },
+                "name": "ball",
+                "$type": "Ball"
+            },
+            "config": {
+                "paddle_ratio": {
+                    "x": 0.01,
+                    "y": 0.1,
+                    "$type": "Vector2"
+                },
+                "ball_ratio": 0.05,
+                "ball_speed_ratio": 0.2,
+                "paddle_speed_ratio": 0.2,
+                "paddle_padding": 0.05,
+                "$type": "Config"
+            },
+            "size": {
+                "x": 800.0,
+                "y": 600.0,
+                "$type": "Vector2"
+            },
+            "time": 1.5,
+            "updates": 1,
+            "$type": "Pong"
+        }
+    },
+    "$type": "Event"
+}

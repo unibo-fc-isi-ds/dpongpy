@@ -4,7 +4,10 @@ from dpongpy.controller import ControlEvent
 import json
 
 
+# if true, makes JSON output earies to read via newlines and spaces.
+# better to disable when using in production, as it increases the size of the datagrams.
 _DEBUG = False
+
 
 
 class Serializer:
@@ -47,7 +50,7 @@ class Serializer:
 
     def _serialize_direction(self, direction: Direction):
         return self._to_dict(direction, "name")
-    
+
     def _serialize_controlevent(self, control_event: ControlEvent):
         return self._to_dict(control_event, "name")
 
@@ -105,7 +108,7 @@ class Deserializer:
 
     def _deserialize_direction(self, obj):
         return Direction[obj["name"]]
-    
+
     def _deserialize_controlevent(self, obj):
         return ControlEvent[obj["name"]]
 
@@ -146,14 +149,3 @@ def serialize(obj, serializer=DEFAULT_SERIALIZER):
 
 def deserialize(input: str, deserializer=DEFAULT_DESERIALIZER):
     return deserializer.deserialize(input)
-
-
-if __name__ == '__main__':
-    _DEBUG = True
-    pong = Pong(size=(800, 600))
-    pong.update(1.5)
-    e = Event(1, {"state": pong})
-    serialized = serialize(e)
-    print(serialized)
-    deserialized = deserialize(serialized)
-    print(deserialized)
