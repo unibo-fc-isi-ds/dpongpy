@@ -8,7 +8,7 @@ THRESHOLD_DGRAM_SIZE = 65536
 UDP_DROP_RATE = float(os.environ.get("UDP_DROP_RATE", 0.0))
 assert 0 <= UDP_DROP_RATE < 1, "Drop rate for outgoing UDP messages must be between 0 (included) and 1 (excluded)"
 if UDP_DROP_RATE > 0:
-    logger.warn(f"Drop rate for outgoing UDP messages is {UDP_DROP_RATE}")
+    logger.warning(f"Drop rate for outgoing UDP messages is {UDP_DROP_RATE}")
 
 
 def udp_socket(bind_to: Address | int = Address.any_local_port()) -> socket.socket:
@@ -95,7 +95,7 @@ class Session(Session):
             assert address.equivalent_to(self.remote_address), f"Received packet from unexpected party {address}"
             return payload
         return None
-    
+
     def close(self):
         self._socket.close()
 
