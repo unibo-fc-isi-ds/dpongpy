@@ -1,5 +1,5 @@
 from dpongpy.model import Pong, Config, Direction
-from dpongpy.controller.local import ActionMap, PongLocalController as PongController
+from dpongpy.controller.local import ActionMap
 import pygame
 from dataclasses import dataclass, field
 from typing import Optional, Collection, Iterable
