@@ -1,7 +1,10 @@
+function isNullOrEmpty(str) { return str === null || str === undefined || str.replace(/\s+/g, '') === ""; }
+
 var dryRun = (process.env.RELEASE_DRY_RUN || "false").toLowerCase() === "true";
 var testPypi = (process.env.RELEASE_TEST_PYPI || "false").toLowerCase() === "true";
 var pypiUsername = process.env.PYPI_USERNAME;
 var pypiPassword = process.env.PYPI_PASSWORD;
+
 
 var prepareCmd = "poetry version -- \${nextRelease.version}";
 var publishCmd = `poetry publish --build --username ${pypiUsername} --password ${pypiPassword}`;
@@ -17,12 +20,16 @@ if (dryRun) {
 
 var config = require('semantic-release-preconfigured-conventional-commits');
 
-config.plugins.push(
-    ["@semantic-release/exec", {
-        "prepareCmd" : prepareCmd,
-        "publishCmd": publishCmd,
-    }]
-)
+if (isNullOrEmpty(pypiUsername) || isNullOrEmpty(pypiPassword)) {
+    console.warn("PyPI credentials not set, skipping the exec plugin");
+} else {
+    config.plugins.push(
+        ["@semantic-release/exec", {
+            "prepareCmd" : prepareCmd,
+            "publishCmd": publishCmd,
+        }]
+    )
+}
 
 if (!dryRun) {
     config.plugins.push(
