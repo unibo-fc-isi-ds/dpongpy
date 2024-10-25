@@ -103,6 +103,3 @@ class Server(Protocol):
 class Client(Session):
     def __init__(self, remote_address: Address):
         ...
-
-    def connect(self):
-        ...

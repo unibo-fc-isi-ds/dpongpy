@@ -111,6 +111,10 @@ class UdpServer(Server):
         self._address = Address.local_port_on_any_interface(port)
         self._socket = udp_socket(self._address)
 
+    @property
+    def local_address(self):
+        return Address(*self._socket.getsockname())
+
     def listen(self) -> UdpSession:
         payload, address = udp_receive(self._socket, True)
         assert address is not None, "Received packet from unknown party"
@@ -139,6 +143,3 @@ class UdpServer(Server):
 class UdpClient(UdpSession):
     def __init__(self, remote_address: Address):
         super().__init__(udp_socket(), remote_address)
-
-    def connect(self):
-        pass
