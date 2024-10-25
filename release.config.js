@@ -22,6 +22,12 @@ var config = require('semantic-release-preconfigured-conventional-commits');
 
 if (isNullOrEmpty(pypiUsername) || isNullOrEmpty(pypiPassword)) {
     console.warn("PyPI credentials not set, skipping the exec plugin");
+    config.plugins.push(
+        ["@semantic-release/exec", {
+            "prepareCmd" : prepareCmd,
+            "publishCmd": "poetry build",
+        }]
+    )
 } else {
     config.plugins.push(
         ["@semantic-release/exec", {
