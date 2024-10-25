@@ -5,7 +5,6 @@ import argparse
 def arg_parser():
     ap = argparse.ArgumentParser()
     ap.prog = "python -m " + dpongpy.__name__
-    # ap.add_argument("--help", action="store_true", help="Show this help message and exit")
     mode = ap.add_argument_group("mode")
     mode.add_argument("--mode", '-m', choices=['local', 'centralised'],
                       help="Run the game in local or centralised mode")
@@ -45,9 +44,6 @@ def args_to_settings(args):
 parser = arg_parser()
 args = parser.parse_args()
 settings = args_to_settings(args)
-# if args.help:
-#     parser.print_help()
-#     exit(0)
 if args.mode == 'local':
     if not settings.initial_paddles:
         settings.initial_paddles = [dpongpy.model.Direction.LEFT, dpongpy.model.Direction.RIGHT]
