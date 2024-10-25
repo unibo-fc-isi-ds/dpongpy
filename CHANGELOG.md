@@ -1,3 +1,65 @@
+## 1.0.0 (2024-10-25)
+
+### ⚠ BREAKING CHANGES
+
+* remove support for python <3.10
+* rename border->wall, Table->Board
+
+### Features
+
+* centralised works ([d5e6061](https://github.com/gciatto/dpongpy/commit/d5e6061e227fff1ad615682fc6dd50670ae5cb87))
+* implement model ([006913f](https://github.com/gciatto/dpongpy/commit/006913fe0e236c173ae8aca59adc548f2efd3ebb))
+* prototype view and controller ([6f02158](https://github.com/gciatto/dpongpy/commit/6f021583d41d558707a7c8bfd75657dec53bfe28))
+* remove support for python <3.10 ([5bf2d7a](https://github.com/gciatto/dpongpy/commit/5bf2d7a179695fa906650a3da87cef090519e738))
+* selectively get pygame events ([8fdaaaf](https://github.com/gciatto/dpongpy/commit/8fdaaaf0fa7ca43e10f4d35d5b197e4c6c645630))
+* simulate package drop ([754b764](https://github.com/gciatto/dpongpy/commit/754b764a3bf45707f7b853e6b0ce92300c87a81a))
+* test and improve model ([b8d378a](https://github.com/gciatto/dpongpy/commit/b8d378a3fb518021d407420a17a73135daed7be7))
+
+### Bug Fixes
+
+* control event (de)serialization ([45fd243](https://github.com/gciatto/dpongpy/commit/45fd2432bc5814040b4b238b8f31d2368e6dcbf5))
+* deterministic assignment of paddle sides to keymaps ([6f55d0c](https://github.com/gciatto/dpongpy/commit/6f55d0c5fd6ba21547b5a7fb955e5e42547f30b7))
+* echo client/server ([fe747dd](https://github.com/gciatto/dpongpy/commit/fe747dd5d15268fd7f40d9751a7de6fa65215d4d))
+* graceful shutdown ([eec80e7](https://github.com/gciatto/dpongpy/commit/eec80e7036bfddd444931dc2a7f8f09ceeed406b))
+* handle padles collisions ([521e04b](https://github.com/gciatto/dpongpy/commit/521e04b0c2b53a52e5815991bca79627ff727b6c))
+* improve model ([b3d173b](https://github.com/gciatto/dpongpy/commit/b3d173bb89919ac0829f8d510b1c5c959adbc9fd))
+* make coordinator and terminal stop in case of communication exception ([4f21e51](https://github.com/gciatto/dpongpy/commit/4f21e5119da9fb7f45a6151f4408d1e39153f368))
+* make remote game updates async ([3c43703](https://github.com/gciatto/dpongpy/commit/3c43703b7b774d0e23ffe4fc8766a7aa41975fea))
+* management of keymaps ([a3f1fd0](https://github.com/gciatto/dpongpy/commit/a3f1fd04c184c11cd437da0745c067f72473bd17))
+* paddle commands initialization works on local too ([c4fc741](https://github.com/gciatto/dpongpy/commit/c4fc74132f4385ee7277bb9aa96577886eba26c8))
+* remote main package import ([539ee3f](https://github.com/gciatto/dpongpy/commit/539ee3f6d6f380ec486cf3fc0be832db7b3a4fcf))
+* server-side if selection ([3b96060](https://github.com/gciatto/dpongpy/commit/3b9606013406a04330793db8eeb8dd94af330187))
+* several minor improvements to code structure ([728ad1d](https://github.com/gciatto/dpongpy/commit/728ad1d6bca63dbb7bfefc005190c97241b55635))
+* udp handles socket close ([85df459](https://github.com/gciatto/dpongpy/commit/85df4591d8cf99a2f323398e2d8a816a2ab41d68))
+* use finally to gracefully handle exceptions in game loop ([7228603](https://github.com/gciatto/dpongpy/commit/722860372e8464a257b54db2761cd321f2cb517a))
+* view does not use python Protocols (which work differently on win) ([0273aa3](https://github.com/gciatto/dpongpy/commit/0273aa33ac9a527d52312fff6ac02b139d8e8de2))
+* wrong type annotation in ControlEvent.is_control_event ([bec24e7](https://github.com/gciatto/dpongpy/commit/bec24e7943857df67758f2ba572fed447046beae))
+
+### Tests
+
+* fix unit tests ([e4c2ed8](https://github.com/gciatto/dpongpy/commit/e4c2ed8d72f764013fc5ae51ff40fd086600cdaa))
+* test presentation ([7ac9994](https://github.com/gciatto/dpongpy/commit/7ac99940639f42dbbe92c6ff00827b1a3965e6d5))
+* udp facilities ([4697570](https://github.com/gciatto/dpongpy/commit/4697570d61a163fc0d16d71b43b9d9654bf6350d))
+
+### General maintenance
+
+* **ci:** fix github release to include wheels ([020d1c3](https://github.com/gciatto/dpongpy/commit/020d1c38492fd720f1e34c73ba5f14e60992d520))
+* consistent ellipsis in Client ([eb6a4de](https://github.com/gciatto/dpongpy/commit/eb6a4def0840ea2f49b8dfe1cc4638780a546fe2))
+* log pong status override ([c3875f5](https://github.com/gciatto/dpongpy/commit/c3875f5ca79827b5721edf8870028886ac03ae4d))
+* **release:** disable release on pypi ([0f85d8d](https://github.com/gciatto/dpongpy/commit/0f85d8da0d166cbbc7cf5de1138ee1ebb3d89c94))
+* remove unused import ([34c4fb7](https://github.com/gciatto/dpongpy/commit/34c4fb71d47f43f3e212074a0bc878f5af3203bb))
+* remove useless files ([610ef5a](https://github.com/gciatto/dpongpy/commit/610ef5a7869f2e248370bb76f8166fd35058a45f))
+* rename project accordingly ([3f9124e](https://github.com/gciatto/dpongpy/commit/3f9124ee310597087ded03ffbf622914bb5adeb0))
+* **style:** fix style to make mypy happy ([e0b64e7](https://github.com/gciatto/dpongpy/commit/e0b64e7d58a23bcc903c2a0609384a03b90aa38b))
+* **style:** remove useless comments in dpongpy ([3b521f7](https://github.com/gciatto/dpongpy/commit/3b521f75d9a0a84423458ff4411f79b7744fc086))
+
+### Refactoring
+
+* avoid code repetition in udp ([609efe4](https://github.com/gciatto/dpongpy/commit/609efe425de89e27a47b4c6f7838606829fa2e2e))
+* better field naming in PongCoordinator ([e4e11e0](https://github.com/gciatto/dpongpy/commit/e4e11e0305c84fc57dbb972b70298b3448c41e56))
+* factorise main ([ea4ff4c](https://github.com/gciatto/dpongpy/commit/ea4ff4c30a7c9a13f0b41e42240b9a2ae2d693b9))
+* rename border->wall, Table->Board ([ac82620](https://github.com/gciatto/dpongpy/commit/ac82620b8be11b55252a210b91ed14481915a45c))
+
 ## [2.1.6](https://github.com/aequitas-aod/template-python-project-poetry/compare/2.1.5...2.1.6) (2024-07-03)
 
 
