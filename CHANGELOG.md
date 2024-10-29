@@ -1,3 +1,18 @@
+## [1.0.1](https://github.com/gciatto/dpongpy/compare/1.0.0...1.0.1) (2024-10-29)
+
+### Dependency updates
+
+* **deps:** update dependency semantic-release-preconfigured-conventional-commits to v1.1.113 ([7155778](https://github.com/gciatto/dpongpy/commit/7155778b751c4da4354bc4d2ca94b8b8b3728f9a))
+* **deps:** update npm to v10.9.0 ([cff8d66](https://github.com/gciatto/dpongpy/commit/cff8d66e605433b499235483e18c4738519291df))
+
+### Bug Fixes
+
+* update project description on poetry and pypi ([37aead4](https://github.com/gciatto/dpongpy/commit/37aead460d85b91696773ec5f28e5d9ae591bcd1))
+
+### General maintenance
+
+* improve readme ([6cc127c](https://github.com/gciatto/dpongpy/commit/6cc127c6a5c75399e6ba04c7706bfeebad61ca5f))
+
 ## 1.0.0 (2024-10-25)
 
 ### ⚠ BREAKING CHANGES
