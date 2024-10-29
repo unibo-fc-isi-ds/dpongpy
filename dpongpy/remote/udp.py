@@ -22,40 +22,26 @@ def udp_socket(bind_to: Address | int = Address.any_local_port()) -> socket.sock
 
 
 def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
-    try:
-        if sock._closed: # type: ignore[attr-defined]
-            raise OSError("Socket is closed")
-        if isinstance(payload, str):
-            payload = payload.encode()
-        if len(payload) > THRESHOLD_DGRAM_SIZE:
-            raise ValueError(f"Payload size must be less than {THRESHOLD_DGRAM_SIZE} bytes ({THRESHOLD_DGRAM_SIZE / 1024} KiB)")
-        if random.uniform(0, 1) < UDP_DROP_RATE:
-            result = len(payload)
-            logger.warning(f"Pretend to send {result} bytes to {address}: {payload!r}")
-        else:
-            result = sock.sendto(payload, address.as_tuple())
-            logger.debug(f"Sent {result} bytes to {address}: {payload!r}")
-        return result
-    except OSError as e:
-        logger.error(e)
-        raise e
+    if isinstance(payload, str):
+        payload = payload.encode()
+    if len(payload) > THRESHOLD_DGRAM_SIZE:
+        raise ValueError(f"Payload size must be less than {THRESHOLD_DGRAM_SIZE} bytes ({THRESHOLD_DGRAM_SIZE / 1024} KiB)")
+    if random.uniform(0, 1) < UDP_DROP_RATE:
+        result = len(payload)
+        logger.warning(f"Pretend to send {result} bytes to {address}: {payload!r}")
+    else:
+        result = sock.sendto(payload, address.as_tuple())
+        logger.debug(f"Sent {result} bytes to {address}: {payload!r}")
+    return result
 
 
 def udp_receive(sock: socket.socket, decode=True) -> tuple[str | bytes | None, Address | None]:
-    try:
-        if sock._closed: # type: ignore[attr-defined]
-            return None, None
-        payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
-        address = Address(*address)
-        logger.debug(f"Received {len(payload)} bytes from {address}: {payload!r}")
-        if decode:
-            payload = payload.decode() # type: ignore[assignment]
-        return payload, address
-    except OSError as e:
-        if sock._closed: # type: ignore[attr-defined]
-            return None, None
-        logger.error(e)
-        raise e
+    payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+    address = Address(*address)
+    logger.debug(f"Received {len(payload)} bytes from {address}: {payload!r}")
+    if decode:
+        payload = payload.decode() # type: ignore[assignment]
+    return payload, address
 
 
 class UdpSession(Session):
