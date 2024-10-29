@@ -31,7 +31,7 @@ class PongCoordinator(PongGame):
 
         class SendToPeersPongView(ShowNothingPongView):
             def render(self):
-                event = coordinator.controller.create_event(ControlEvent.TIME_ELAPSED, dt=coordinator.dt, status=self._pong)
+                event = coordinator.controller.create_event(ControlEvent.TIME_ELAPSED, dt=coordinator.dt, pong=self._pong)
                 coordinator._broadcast_to_all_peers(event)
 
         return SendToPeersPongView(coordinator.pong)
@@ -116,8 +116,6 @@ class PongTerminal(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
-        self._thread_receiver = threading.Thread(target=self._handle_ingoing_messages, daemon=True)
-        self._thread_receiver.start()
 
     def create_controller(terminal, paddle_commands = None):
         from dpongpy.controller.local import PongInputHandler, EventHandler
@@ -127,30 +125,34 @@ class PongTerminal(PongGame):
                 PongInputHandler.__init__(self, pong, paddle_commands)
 
             def post_event(self, event: Event | ControlEvent, **kwargs):
-                event = super().post_event(event, **kwargs)
-                if not ControlEvent.TIME_ELAPSED.matches(event):
-                    terminal.client.send(serialize(event))
+                event = self.create_event(event, **kwargs)
+                terminal.client.send(serialize(event))
+                if event.type == ControlEvent.PLAYER_LEAVE.value:
+                    super().post_event(event, **kwargs)
                 return event
 
             def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt)
+                return super().handle_inputs(dt=None)
+            
+            def handle_events(self):
+                terminal._handle_ingoing_messages()
+                for event in pygame.event.get():
+                    if ControlEvent.TIME_ELAPSED.matches(event):
+                        pong = event.dict["pong"]
+                        self.on_time_elapsed(pong, dt=event.dict["dt"])
+                    if ControlEvent.GAME_OVER.matches(event):
+                        self.on_game_over(self._pong)
 
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None):
-                if status is None or pong is status:
-                    pong.update(dt)
-                else:
-                    pong.override(status)
-
-            def on_paddle_move(self, pong: Pong, paddle_index: int | Direction, direction: Direction):
-                pong.move_paddle(paddle_index, direction)
+            def on_time_elapsed(self, pong: Pong, dt: float):
+                terminal.pong.override(pong)
 
             def on_game_over(self, pong: Pong):
                 terminal.stop()
-
+        
         return Controller(terminal.pong, paddle_commands)
-
+    
     def _handle_ingoing_messages(self):
-        while self.running:
+        if self.running:
             message = self.client.receive()
             if message is not None:
                 message = deserialize(message)
