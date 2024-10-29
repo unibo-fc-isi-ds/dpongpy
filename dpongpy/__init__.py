@@ -1,4 +1,6 @@
 from dpongpy.model import Pong, Config, Direction
+from dpongpy.log import logger, logging
+from dpongpy.view import ShowNothingPongView
 from dpongpy.controller.local import ActionMap
 import pygame
 from dataclasses import dataclass, field
@@ -14,6 +16,7 @@ class Settings:
     host: Optional[str] = None
     port: Optional[int] = None
     initial_paddles: Collection[Direction] = (Direction.LEFT, Direction.RIGHT)
+    gui: bool = True
 
 
 class PongGame:
@@ -25,10 +28,12 @@ class PongGame:
             paddles=self.settings.initial_paddles
         )
         self.dt = None
-        self.view = self.create_view()
+        self.view = self.create_view() if self.settings.gui else ShowNothingPongView(self.pong) 
         self.clock = pygame.time.Clock()
         self.running = True
         self.controller = self.create_controller(self.settings.initial_paddles)
+        if self.settings.debug:
+            logger.setLevel(logging.DEBUG)
 
     def create_view(self):
         from dpongpy.view import ScreenPongView
@@ -53,7 +58,8 @@ class PongGame:
         pygame.quit()
 
     def at_each_run(self):
-        pygame.display.flip()
+        if self.settings.gui:
+            pygame.display.flip()
 
     def run(self):
         try:

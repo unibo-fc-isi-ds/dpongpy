@@ -1,4 +1,5 @@
-import dpongpy.model
+import dpongpy
+from dpongpy.model import Direction
 import argparse
 
 
@@ -14,13 +15,16 @@ def arg_parser():
     networking.add_argument("--host", '-H', help="Host to connect to", type=str, default="localhost")
     networking.add_argument("--port", '-p', help="Port to connect to", type=int, default=None)
     game = ap.add_argument_group("game")
-    game.add_argument("--side", '-s', choices=[dir.name.lower() for dir in dpongpy.model.Direction.values()],
+    game.add_argument("--side", '-s', 
+                      choices=[dir.name.lower() for dir in Direction.values() if dir != Direction.NONE],
                       help="Side to play on", action="append", default=[], dest="sides")
-    game.add_argument("--keys", '-k', choices=dpongpy.controller.ActionMap.all_mappings().keys(),
+    game.add_argument("--keys", '-k', 
+                      choices=dpongpy.controller.ActionMap.all_mappings().keys(),
                       help="Keymaps for sides", action="append", default=None)
     game.add_argument("--debug", '-d', help="Enable debug mode", action="store_true")
     game.add_argument("--size", '-S', help="Size of the game window", type=int, nargs=2, default=[900, 600])
     game.add_argument("--fps", '-f', help="Frames per second", type=int, default=60)
+    game.add_argument("--no-gui", help="Disable GUI", action="store_true", default=False)
     return ap
 
 
@@ -35,9 +39,10 @@ def args_to_settings(args):
         args.keys = list(dpongpy.controller.ActionMap.all_mappings().keys())[:len(args.sides)]
     assert len(args.sides) == len(args.keys), "Number of sides and keymaps must match"
     settings.initial_paddles = {
-        dpongpy.model.Direction[direction.upper()]: dpongpy.controller.ActionMap.all_mappings()[keymap]
+        Direction[direction.upper()]: dpongpy.controller.ActionMap.all_mappings()[keymap]
         for direction, keymap in zip(args.sides, args.keys)
     }
+    settings.gui = not args.no_gui
     return settings
 
 
@@ -46,7 +51,7 @@ args = parser.parse_args()
 settings = args_to_settings(args)
 if args.mode == 'local':
     if not settings.initial_paddles:
-        settings.initial_paddles = [dpongpy.model.Direction.LEFT, dpongpy.model.Direction.RIGHT]
+        settings.initial_paddles = [Direction.LEFT, Direction.RIGHT]
     dpongpy.main(settings)
     exit(0)
 if args.mode == 'centralised':
