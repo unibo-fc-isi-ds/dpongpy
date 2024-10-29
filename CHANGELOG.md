@@ -1,3 +1,24 @@
+## [1.1.0](https://github.com/gciatto/dpongpy/compare/1.0.0...1.1.0) (2024-10-29)
+
+### Features
+
+* support no gui and debug modes ([c9e23f6](https://github.com/gciatto/dpongpy/commit/c9e23f631436527a08d183270e28e6b3bd899eca))
+
+### Dependency updates
+
+* **deps:** update dependency semantic-release-preconfigured-conventional-commits to v1.1.113 ([7155778](https://github.com/gciatto/dpongpy/commit/7155778b751c4da4354bc4d2ca94b8b8b3728f9a))
+* **deps:** update npm to v10.9.0 ([cff8d66](https://github.com/gciatto/dpongpy/commit/cff8d66e605433b499235483e18c4738519291df))
+
+### Bug Fixes
+
+* update project description on poetry and pypi ([37aead4](https://github.com/gciatto/dpongpy/commit/37aead460d85b91696773ec5f28e5d9ae591bcd1))
+
+### General maintenance
+
+* improve readme ([6cc127c](https://github.com/gciatto/dpongpy/commit/6cc127c6a5c75399e6ba04c7706bfeebad61ca5f))
+* private method names in remote.centralised ([8af2c5b](https://github.com/gciatto/dpongpy/commit/8af2c5beaa7f7ee6e0211678dfd4322868b01cc9))
+* **release:** 1.0.1 [skip ci] ([c2c4889](https://github.com/gciatto/dpongpy/commit/c2c4889404f5508bd9892cc7be55344f31fcc1f4))
+
 ## [1.0.1](https://github.com/gciatto/dpongpy/compare/1.0.0...1.0.1) (2024-10-29)
 
 ### Dependency updates
