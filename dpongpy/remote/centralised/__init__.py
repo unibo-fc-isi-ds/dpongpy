@@ -20,7 +20,7 @@ class PongCoordinator(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.server = UdpServer(self.settings.port or DEFAULT_PORT)
-        self._thread_receiver = threading.Thread(target=self.__handle_ingoing_messages, daemon=True)
+        self._thread_receiver = threading.Thread(target=self._handle_ingoing_messages, daemon=True)
         self._thread_receiver.start()
         self._peers: set[Address] = set()
         self._lock = threading.RLock()
@@ -99,7 +99,7 @@ class PongCoordinator(PongGame):
         for peer in self.peers:
             self.server.send(payload=event, address=peer)
 
-    def __handle_ingoing_messages(self):
+    def _handle_ingoing_messages(self):
         try:
             max_retries = 3
             while self.running:
@@ -110,7 +110,7 @@ class PongCoordinator(PongGame):
                     assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
                     pygame.event.post(message)
                 elif self.running:
-                    logger.warn(f"Receive operation returned None: the server may have been closed ahead of time")
+                    logger.warning(f"Receive operation returned None: the server may have been closed ahead of time")
                     max_retries -= 1
                     if max_retries == 0: break
         except Exception as e:
@@ -127,7 +127,7 @@ class PongTerminal(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
-        self._thread_receiver = threading.Thread(target=self.__handle_ingoing_messages, daemon=True)
+        self._thread_receiver = threading.Thread(target=self._handle_ingoing_messages, daemon=True)
         self._thread_receiver.start()
 
     def create_controller(terminal, paddle_commands = None):
@@ -160,7 +160,7 @@ class PongTerminal(PongGame):
 
         return Controller(terminal.pong, paddle_commands)
 
-    def __handle_ingoing_messages(self):
+    def _handle_ingoing_messages(self):
         try:
             max_retries = 3
             while self.running:
@@ -170,7 +170,7 @@ class PongTerminal(PongGame):
                     assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
                     pygame.event.post(message)
                 elif self.running:
-                    logger.warn(f"Receive operation returned None: the client may have been closed ahead of time")
+                    logger.warning(f"Receive operation returned None: the client may have been closed ahead of time")
                     max_retries -= 1
                     if max_retries == 0: break
         except Exception as e:
