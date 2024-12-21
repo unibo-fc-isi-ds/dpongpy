@@ -66,6 +66,8 @@ class PongGame:
             self.dt = 0
             self.before_run()
             while self.running:
+                self.pong.interpolate_state()
+
                 self.controller.handle_inputs(self.dt)
                 self.controller.handle_events()
                 self.view.render()

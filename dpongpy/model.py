@@ -165,6 +165,9 @@ class GameObject(Sized, Positioned):
         self._size = Vector2(size)
         self._position = Vector2(position) if position is not None else Vector2()
         self._speed = Vector2(speed) if speed is not None else Vector2()
+        self._server_size = None
+        self._server_position = None
+        self._server_speed = None
         self.name = name or self.__class__.__name__.lower()
 
     def __eq__(self, other):
@@ -229,6 +232,20 @@ class GameObject(Sized, Positioned):
         self.size = other.size
         self.position = other.position
         self.speed = other.speed
+
+    def update_server_state(self, other: 'GameObject'):
+        assert isinstance(other, type(self)) and other.name == self.name, f"Invalid override: {other} -> {self}"
+        self._server_size = other.size
+        self._server_position = other.position
+        self._server_speed = other.speed
+
+    def interpolate_towards_server_state(self, progress):
+        if self._server_size is not None:
+            self.size = self.size.lerp(self._server_size, progress)
+        if self._server_position is not None:
+            self.position = self.position.lerp(self._server_position, progress)
+        if self._server_speed is not None:
+            self.speed = self.speed.lerp(self._server_speed, progress)
 
 
 for method_name in ['overlaps', 'is_inside', '__contains__', 'intersection_with', 'hits']:
@@ -302,7 +319,12 @@ class Pong(Sized):
         self.reset_ball()
         self.board = Board(self.size)
         self.updates = 0
+        self.server_updates = 0
         self.time = 0
+        self.local_time = 0
+        self.last_update_time = 0
+        self.last_server_time = None
+        self.current_server_time = None
         if paddles is None:
             paddles = (Direction.LEFT, Direction.RIGHT)
         self.paddles = [paddle for paddle in paddles if isinstance(paddle, Paddle)]
@@ -315,7 +337,12 @@ class Pong(Sized):
             self.ball == value.ball and \
             self.paddles == value.paddles and \
             self.updates == value.updates and \
-            self.time == value.time
+            self.server_updates == value.server_updates and \
+            self.time == value.time and \
+            self.local_time == value.local_time and \
+            self.last_update_time == value.last_update_time and \
+            self.last_server_time == value.last_server_time and \
+            self.current_server_time == value.current_server_time
 
     def __hash__(self):
         return hash((self.size, self.config, self.ball, tuple(self.paddles), self.updates, self.time))
@@ -338,7 +365,12 @@ class Pong(Sized):
                 f'id={id(self)}, '
                 f'size={self.size}, '
                 f'time={self.time}, '
+                f'local_time={self.local_time}, '
+                f'last_server_time={self.last_server_time}, '
+                f'last_server_time={self.last_server_time}, '
+                f'current_server_time={self.current_server_time}, '
                 f'updates={self.updates}, '
+                f'server_updates={self.server_updates}, '
                 f'config={self.config}'
                 f'ball={repr(self.ball)}, '
                 f'paddles={self.paddles}, '
@@ -409,6 +441,7 @@ class Pong(Sized):
     def update(self, delta_time: float):
         self.updates += 1
         self.time += delta_time
+        self.local_time += delta_time
         logger.debug(f"Update {self.updates} (time: {self.time})")
         self.ball.update(delta_time)
         for paddle in self.paddles:
@@ -448,15 +481,43 @@ class Pong(Sized):
     def stop_paddle(self, paddle: int | Direction):
         self.move_paddle(paddle, Direction.NONE)
 
-    def override(self, other: 'Pong'):
+    def interpolate_state(self):
+        if self.last_server_time is None or self.current_server_time is None:
+            # We don't have enough data to interpolate yet
+            return
+
+        delta_time = self.local_time - self.last_update_time
+        server_interval = self.current_server_time - self.last_server_time
+        progress = min(delta_time / server_interval, 1.0)
+
+        self.ball.interpolate_towards_server_state(progress)
+        for paddle in self.paddles:
+            paddle.interpolate_towards_server_state(progress)
+
+    def override(self, other: 'Pong', update_server_state=False):
         if self is other:
             return
+
+        if self.server_updates is not None and self.server_updates > other.updates:
+            # Ignore updates from the past
+            return
+
+        if update_server_state:
+            # Set timestamps
+            self.last_update_time = self.local_time
+            self.last_server_time = self.current_server_time
+            self.current_server_time = other.time
+
         logger.debug(f"Overriding Pong status")
         self.size = other.size
         self.config = other.config
-        self.ball.override(other.ball)
+        if update_server_state:
+            self.ball.update_server_state(other.ball)
+        else:
+            self.ball.override(other.ball)
         self.board = other.board
         self.updates = other.updates
+        self.server_updates = other.updates
         self.time = other.time
         my_paddles = set((paddle.side for paddle in self.paddles))
         other_paddles = set((paddle.side for paddle in other.paddles))
@@ -471,5 +532,8 @@ class Pong(Sized):
         for side, paddle in removed.items():
             self.remove_paddle(side)
         for side, paddle in common.items():
-            self.paddle(side).override(other.paddle(side))
+            if update_server_state:
+                self.paddle(side).update_server_state(other.paddle(side))
+            else:
+                self.paddle(side).override(other.paddle(side))
         return added, removed
