@@ -137,9 +137,9 @@ class PongTerminal(PongGame):
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
-        
+
         return Controller(terminal.pong, paddle_commands)
-    
+
     def _handle_ingoing_messages(self):
         while self.running:
             message = self.client.receive()
