@@ -1,6 +1,9 @@
 # Uncomment the following line to enable packet dropping
 #export UDP_DROP_RATE := "0.2"
 
+local:
+    poetry run dpongpy -m local --side left --keys wasd --side right --keys arrows
+
 server:
     poetry run dpongpy -m centralised -r coordinator -f 30
 
