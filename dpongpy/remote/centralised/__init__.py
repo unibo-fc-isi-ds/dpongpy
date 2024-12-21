@@ -124,10 +124,16 @@ class PongTerminal(PongGame):
                 return event
 
             def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
-            
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
-                pong.override(status)
+                return super().handle_inputs(dt)
+
+            def on_paddle_move(self, pong: Pong, paddle_index: Direction, direction: Direction):
+                pong.move_paddle(paddle_index, direction)
+
+            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None): # type: ignore[override]
+                if status is None:
+                    pong.update(dt)
+                else:
+                    pong.override(status, update_server_state=True)
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
