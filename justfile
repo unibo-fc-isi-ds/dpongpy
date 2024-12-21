@@ -11,4 +11,4 @@ client1:
     poetry run dpongpy -m centralised -r terminal --side left --keys wasd --host 127.0.0.1
 
 client2:
-    poetry run dpongpy -m centralised -r terminal --side right --keys arrows --host 127.0.0.1
+    poetry run dpongpy -m centralised -r terminal --side right --keys wasd --host 127.0.0.1
