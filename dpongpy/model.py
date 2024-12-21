@@ -165,6 +165,9 @@ class GameObject(Sized, Positioned):
         self._size = Vector2(size)
         self._position = Vector2(position) if position is not None else Vector2()
         self._speed = Vector2(speed) if speed is not None else Vector2()
+        self._server_size = None
+        self._server_position = None
+        self._server_speed = None
         self.name = name or self.__class__.__name__.lower()
 
     def __eq__(self, other):
@@ -229,6 +232,20 @@ class GameObject(Sized, Positioned):
         self.size = other.size
         self.position = other.position
         self.speed = other.speed
+
+    def update_server_state(self, other: 'GameObject'):
+        assert isinstance(other, type(self)) and other.name == self.name, f"Invalid override: {other} -> {self}"
+        self._server_size = other.size
+        self._server_position = other.position
+        self._server_speed = other.speed
+
+    def interpolate_towards_server_state(self, progress):
+        if self._server_size is not None:
+            self.size = self.size.lerp(self._server_size, progress)
+        if self._server_position is not None:
+            self.position = self.position.lerp(self._server_position, progress)
+        if self._server_speed is not None:
+            self.speed = self.speed.lerp(self._server_speed, progress)
 
 
 for method_name in ['overlaps', 'is_inside', '__contains__', 'intersection_with', 'hits']:
