@@ -319,7 +319,12 @@ class Pong(Sized):
         self.reset_ball()
         self.board = Board(self.size)
         self.updates = 0
+        self.server_updates = 0
         self.time = 0
+        self.local_time = 0
+        self.last_update_time = 0
+        self.last_server_time = None
+        self.current_server_time = None
         if paddles is None:
             paddles = (Direction.LEFT, Direction.RIGHT)
         self.paddles = [paddle for paddle in paddles if isinstance(paddle, Paddle)]
@@ -332,7 +337,12 @@ class Pong(Sized):
             self.ball == value.ball and \
             self.paddles == value.paddles and \
             self.updates == value.updates and \
-            self.time == value.time
+            self.server_updates == value.server_updates and \
+            self.time == value.time and \
+            self.local_time == value.local_time and \
+            self.last_update_time == value.last_update_time and \
+            self.last_server_time == value.last_server_time and \
+            self.current_server_time == value.current_server_time
 
     def __hash__(self):
         return hash((self.size, self.config, self.ball, tuple(self.paddles), self.updates, self.time))
@@ -355,7 +365,12 @@ class Pong(Sized):
                 f'id={id(self)}, '
                 f'size={self.size}, '
                 f'time={self.time}, '
+                f'local_time={self.local_time}, '
+                f'last_server_time={self.last_server_time}, '
+                f'last_server_time={self.last_server_time}, '
+                f'current_server_time={self.current_server_time}, '
                 f'updates={self.updates}, '
+                f'server_updates={self.server_updates}, '
                 f'config={self.config}'
                 f'ball={repr(self.ball)}, '
                 f'paddles={self.paddles}, '
@@ -426,6 +441,7 @@ class Pong(Sized):
     def update(self, delta_time: float):
         self.updates += 1
         self.time += delta_time
+        self.local_time += delta_time
         logger.debug(f"Update {self.updates} (time: {self.time})")
         self.ball.update(delta_time)
         for paddle in self.paddles:
@@ -468,6 +484,17 @@ class Pong(Sized):
     def override(self, other: 'Pong', update_server_state=False):
         if self is other:
             return
+
+        if self.server_updates is not None and self.server_updates > other.updates:
+            # Ignore updates from the past
+            return
+
+        if update_server_state:
+            # Set timestamps
+            self.last_update_time = self.local_time
+            self.last_server_time = self.current_server_time
+            self.current_server_time = other.time
+
         logger.debug(f"Overriding Pong status")
         self.size = other.size
         self.config = other.config
@@ -477,6 +504,7 @@ class Pong(Sized):
             self.ball.override(other.ball)
         self.board = other.board
         self.updates = other.updates
+        self.server_updates = other.updates
         self.time = other.time
         my_paddles = set((paddle.side for paddle in self.paddles))
         other_paddles = set((paddle.side for paddle in other.paddles))
