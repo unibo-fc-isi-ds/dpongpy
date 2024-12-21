@@ -481,6 +481,19 @@ class Pong(Sized):
     def stop_paddle(self, paddle: int | Direction):
         self.move_paddle(paddle, Direction.NONE)
 
+    def interpolate_state(self):
+        if self.last_server_time is None or self.current_server_time is None:
+            # We don't have enough data to interpolate yet
+            return
+
+        delta_time = self.local_time - self.last_update_time
+        server_interval = self.current_server_time - self.last_server_time
+        progress = min(delta_time / server_interval, 1.0)
+
+        self.ball.interpolate_towards_server_state(progress)
+        for paddle in self.paddles:
+            paddle.interpolate_towards_server_state(progress)
+
     def override(self, other: 'Pong', update_server_state=False):
         if self is other:
             return
