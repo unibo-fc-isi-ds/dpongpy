@@ -7,4 +7,3 @@ pkgs.mkShell {
     pkgs.just
   ];
 }
-
