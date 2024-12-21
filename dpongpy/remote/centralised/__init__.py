@@ -23,6 +23,7 @@ class PongCoordinator(PongGame):
         self.server = UdpServer(self.settings.port or DEFAULT_PORT)
         self._thread_receiver = threading.Thread(target=self._handle_ingoing_messages, daemon=True)
         self._thread_receiver.start()
+        self._peers: set[Address] = set()
         self._lock = threading.RLock()
 
     def create_view(coordinator):
