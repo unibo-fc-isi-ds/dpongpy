@@ -2,7 +2,7 @@
 #export UDP_DROP_RATE := "0.2"
 
 server:
-    poetry run dpongpy -m centralised -r coordinator
+    poetry run dpongpy -m centralised -r coordinator -f 30
 
 client1:
     poetry run dpongpy -m centralised -r terminal --side left --keys wasd --host 127.0.0.1
