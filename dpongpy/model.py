@@ -465,13 +465,16 @@ class Pong(Sized):
     def stop_paddle(self, paddle: int | Direction):
         self.move_paddle(paddle, Direction.NONE)
 
-    def override(self, other: 'Pong'):
+    def override(self, other: 'Pong', update_server_state=False):
         if self is other:
             return
         logger.debug(f"Overriding Pong status")
         self.size = other.size
         self.config = other.config
-        self.ball.override(other.ball)
+        if update_server_state:
+            self.ball.update_server_state(other.ball)
+        else:
+            self.ball.override(other.ball)
         self.board = other.board
         self.updates = other.updates
         self.time = other.time
@@ -488,5 +491,8 @@ class Pong(Sized):
         for side, paddle in removed.items():
             self.remove_paddle(side)
         for side, paddle in common.items():
-            self.paddle(side).override(other.paddle(side))
+            if update_server_state:
+                self.paddle(side).update_server_state(other.paddle(side))
+            else:
+                self.paddle(side).override(other.paddle(side))
         return added, removed
