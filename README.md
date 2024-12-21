@@ -14,6 +14,6 @@ To execute pong coordinator:
 
 To execute pong terminal:
 
-``` python -m dpongpy --mode centralised --role terminal --side left --keys wasd --host IP_COORDINATOR --port PORT_COORDINATOR```
+``` python -m dpongpy --mode centralised --role terminal --side left --keys wasd --host IP_COORDINATOR --port PORT_COORDINATOR ```
 
 Specifying paddle side, coordinator ip address and coordinator port
