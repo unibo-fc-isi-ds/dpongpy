@@ -11,6 +11,7 @@ from typing import Optional, Collection, Iterable
 class Settings:
     config: Config = field(default_factory=Config)
     debug: bool = False
+    delay: bool = False
     size: tuple = (800, 600)
     fps: int = 60
     host: Optional[str] = None

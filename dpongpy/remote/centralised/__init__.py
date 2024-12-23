@@ -29,10 +29,14 @@ class PongCoordinator(PongGame):
     def create_view(coordinator):
         from dpongpy.view import ShowNothingPongView
         from dpongpy.controller.local import ControlEvent
+        import time
+        import random
 
         class SendToPeersPongView(ShowNothingPongView):
             def render(self):
                 event = coordinator.controller.create_event(ControlEvent.TIME_ELAPSED, dt=coordinator.dt, status=self._pong)
+                if coordinator.settings.delay:
+                    time.sleep(random.uniform(0.01, 0.1))
                 coordinator._broadcast_to_all_peers(event)
 
         return SendToPeersPongView(coordinator.pong)
