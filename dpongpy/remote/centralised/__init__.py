@@ -6,6 +6,8 @@ from dpongpy.controller import ControlEvent
 from dpongpy.model import Direction, Pong
 from dpongpy.remote.udp import UdpClient, UdpServer, Address
 from dpongpy.remote.presentation import serialize, deserialize
+import time
+
 import threading
 
 
@@ -100,15 +102,21 @@ class PongCoordinator(PongGame):
 
 
 class PongTerminal(PongGame):
-
     def __init__(self, settings: Settings = None):
         settings = settings or Settings()
         assert len(settings.initial_paddles) == 1, "Only one paddle is allowed in terminal mode"
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
-        self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
 
-    def create_controller(terminal, paddle_commands = None):
+        host = self.settings.host or DEFAULT_HOST
+        port = self.settings.port or DEFAULT_PORT
+        self.client = UdpClient(Address(host, port))
+
+        self.last_remote_update = time.time()
+        self._listener_thread = threading.Thread(target=self._listen_to_coordinator, daemon=True)
+        self._listener_thread.start()
+
+    def create_controller(terminal, paddle_commands=None):
         from dpongpy.controller.local import PongInputHandler, EventHandler
 
         class Controller(PongInputHandler, EventHandler):
@@ -122,31 +130,71 @@ class PongTerminal(PongGame):
                 return event
 
             def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
-            
+                return super().handle_inputs(dt=None)
+
             def handle_events(self):
                 terminal._handle_ingoing_messages()
                 super().handle_events()
-            
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
+
+            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong):
                 pong.override(status)
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
-        
+
         return Controller(terminal.pong, paddle_commands)
-    
+
+    def _listen_to_coordinator(self):
+        while self.running:
+            try:
+                message = self.client.receive(timeout=0.1)
+                remote_state = deserialize(message)
+                if isinstance(remote_state, Pong):
+                    self.last_remote_update = time.time()
+                    self.remote_state = remote_state
+            except TimeoutError:
+                logger.warning("Coordinator unresponsive. Continuing with local updates.")
+            except Exception as e:
+                logger.error(f"Error while receiving updates: {e}")
+
     def _handle_ingoing_messages(self):
-        if self.running:
-            message = self.client.receive()
+        try:
+            message = self.client.receive(timeout=0.1)
             message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+            assert isinstance(message, pygame.event.Event)
             pygame.event.post(message)
+        except TimeoutError:
+            pass 
+        except Exception as e:
+            logger.error(f"Error while handling messages: {e}")
 
     def before_run(self):
         super().before_run()
         for paddle in self.pong.paddles:
             self.controller.post_event(ControlEvent.PLAYER_JOIN, paddle_index=paddle.side)
+
+    def run(self):
+        try:
+            self.before_run()
+            self.dt = 0
+
+            while self.running:
+                now = time.time()
+                time_since_last_update = now - self.last_remote_update if hasattr(self, 'last_remote_update') else 0
+
+                if hasattr(self, 'remote_state') and time_since_last_update < 1:
+                    alpha = min(1, time_since_last_update * 1.1)
+                    self.pong.ball.position = (1 - alpha) * self.pong.ball.position + alpha * self.remote_state.ball.position
+                    self.pong.ball.speed = (1 - alpha) * self.pong.ball.speed + alpha * self.remote_state.ball.speed
+
+                self.controller.handle_inputs(self.dt)
+                self.controller.handle_events()
+                self.pong.update(self.dt)
+                self.view.render()
+                self.at_each_run()
+                self.dt = self.clock.tick(self.settings.fps) / 1000
+        finally:
+            self.after_run()
 
     def after_run(self):
         self.client.close()
