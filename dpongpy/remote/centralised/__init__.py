@@ -10,7 +10,7 @@ import threading
 
 
 DEFAULT_HOST = "localhost"
-DEFAULT_PORT = 12345
+DEFAULT_PORT = 12346
 
 
 class PongCoordinator(PongGame):
@@ -133,7 +133,7 @@ class PongTerminal(PongGame):
                 #terminal._handle_ingoing_messages()
                 super().handle_events()
             
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
+            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None): # type: ignore[override]
                 # Se il server ritorna qualcosa faccio override, altrimenti faccio update locale
                 if status is not None:
                     pong.override(status)
