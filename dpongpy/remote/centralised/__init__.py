@@ -130,7 +130,7 @@ class PongTerminal(PongGame):
                     pong.override(status)
                 else:
                     #otherwise an update is simulated
-                    pong.update(status)
+                    pong.update(dt)
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
