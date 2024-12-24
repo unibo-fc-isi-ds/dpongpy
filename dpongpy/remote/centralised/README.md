@@ -6,6 +6,6 @@ The terminal's game status is overridden whenever a new status message is receiv
 How to Test
 Run the game in centralized mode, using one coordinator and as two terminals for testing. 
 
-python -m dpongpy --mode centralised --role coordinator 
-python -m dpongpy --mode centralised --role terminal --side left --keys wasd --host IP_COORDINATOR
+python -m dpongpy --mode centralised --role coordinator  
+python -m dpongpy --mode centralised --role terminal --side left --keys wasd --host IP_COORDINATOR  
 python -m dpongpy --mode centralised --role terminal --side right --keys arrows --host IP_COORDINATOR
