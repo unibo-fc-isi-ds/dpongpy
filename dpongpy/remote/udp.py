@@ -129,3 +129,13 @@ class UdpServer(Server):
 class UdpClient(UdpSession):
     def __init__(self, remote_address: Address):
         super().__init__(udp_socket(), remote_address)
+
+    def receive(self, decode=True, timeout=None):
+        self._socket.settimeout(timeout)
+        try:
+            payload, address = udp_receive(self._socket, decode)
+            return payload
+        except socket.timeout:
+            raise TimeoutError("Timeout during receive")
+        finally:
+            self._socket.settimeout(None)
