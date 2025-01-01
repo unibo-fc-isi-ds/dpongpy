@@ -11,6 +11,7 @@ import threading
 
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12345
+SPECULATIVE_EVENT_TIMEOUT = 18  # milliseconds
 
 
 class PongCoordinator(PongGame):
@@ -21,7 +22,8 @@ class PongCoordinator(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.server = UdpServer(self.settings.port or DEFAULT_PORT)
-        self._thread_receiver = threading.Thread(target=self._handle_ingoing_messages, daemon=True)
+        self._thread_receiver = threading.Thread(
+            target=self._handle_ingoing_messages, daemon=True)
         self._thread_receiver.start()
         self._peers: set[Address] = set()
         self._lock = threading.RLock()
@@ -32,7 +34,8 @@ class PongCoordinator(PongGame):
 
         class SendToPeersPongView(ShowNothingPongView):
             def render(self):
-                event = coordinator.controller.create_event(ControlEvent.TIME_ELAPSED, dt=coordinator.dt, status=self._pong)
+                event = coordinator.controller.create_event(
+                    ControlEvent.TIME_ELAPSED, dt=coordinator.dt, status=self._pong)
                 coordinator._broadcast_to_all_peers(event)
 
         return SendToPeersPongView(coordinator.pong)
@@ -95,7 +98,8 @@ class PongCoordinator(PongGame):
             message, sender = self.server.receive()
             self.add_peer(sender)
             message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+            assert isinstance(message, pygame.event.Event), f"Expected {
+                pygame.event.Event}, got {type(message)}"
             pygame.event.post(message)
 
 
@@ -103,12 +107,16 @@ class PongTerminal(PongGame):
 
     def __init__(self, settings: Settings = None):
         settings = settings or Settings()
-        assert len(settings.initial_paddles) == 1, "Only one paddle is allowed in terminal mode"
+        assert len(
+            settings.initial_paddles) == 1, "Only one paddle is allowed in terminal mode"
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
-        self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
+        self.client = UdpClient(
+            Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
+        # Contains the last time a message was received
+        self.last_received_time = pygame.time.get_ticks()
 
-    def create_controller(terminal, paddle_commands = None):
+    def create_controller(terminal, paddle_commands=None):
         from dpongpy.controller.local import PongInputHandler, EventHandler
 
         class Controller(PongInputHandler, EventHandler):
@@ -122,40 +130,58 @@ class PongTerminal(PongGame):
                 return event
 
             def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
-            
+                # just handle input events, do not handle time elapsed
+                return super().handle_inputs(dt=None)
+
             def handle_events(self):
-                terminal._handle_ingoing_messages()
+                self.ingoing_message_thread = threading.Thread(
+                    target=terminal._handle_ingoing_messages, daemon=True).start()
+                self.speculative_event_thread = threading.Thread(target=terminal.handle_speculative_events, daemon=True).start()
                 super().handle_events()
-            
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
+
+            # type: ignore[override]
+            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong):
                 pong.override(status)
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
-        
+                self.ingoing_message_thread.join()
+                self.speculative_event_thread.join()
+
         return Controller(terminal.pong, paddle_commands)
-    
+
     def _handle_ingoing_messages(self):
         if self.running:
             message = self.client.receive()
             message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+            assert isinstance(message, pygame.event.Event), f"Expected {
+                pygame.event.Event}, got {type(message)}"
             pygame.event.post(message)
+            self.last_received_time = pygame.time.get_ticks()
+
+    def handle_speculative_events(self):
+        if self.running:
+            if pygame.time.get_ticks() - self.last_received_time > SPECULATIVE_EVENT_TIMEOUT:
+                self.pong.update(
+                    pygame.time.get_ticks() - self.last_received_time)
+                self.controller.handle_inputs()
+                self.last_received_time = pygame.time.get_ticks()
+            pygame.time.wait(int(SPECULATIVE_EVENT_TIMEOUT/2))
 
     def before_run(self):
         super().before_run()
         for paddle in self.pong.paddles:
-            self.controller.post_event(ControlEvent.PLAYER_JOIN, paddle_index=paddle.side)
+            self.controller.post_event(
+                ControlEvent.PLAYER_JOIN, paddle_index=paddle.side)
 
     def after_run(self):
         self.client.close()
         super().after_run()
 
 
-def main_coordinator(settings = None):
+def main_coordinator(settings=None):
     PongCoordinator(settings).run()
 
 
-def main_terminal(settings = None):
+def main_terminal(settings=None):
     PongTerminal(settings).run()
