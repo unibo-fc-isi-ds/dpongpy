@@ -7,6 +7,7 @@ from dpongpy.model import Direction, Pong
 from dpongpy.remote.udp import UdpClient, UdpServer, Address
 from dpongpy.remote.presentation import serialize, deserialize
 import threading
+import queue
 
 
 DEFAULT_HOST = "localhost"
@@ -107,6 +108,11 @@ class PongTerminal(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
+        self._thread_receiver = threading.Thread(target=self._handle_ingoing_messages, daemon=True)
+        self._thread_receiver.start()
+        self._events_queue = queue.Queue()
+        self._thread_sender = threading.Thread(target=self._process_message_queue, daemon=True)
+        self._thread_sender.start()
 
     def create_controller(terminal, paddle_commands = None):
         from dpongpy.controller.local import PongInputHandler, EventHandler
@@ -118,30 +124,44 @@ class PongTerminal(PongGame):
             def post_event(self, event: Event | ControlEvent, **kwargs):
                 event = super().post_event(event, **kwargs)
                 if not ControlEvent.TIME_ELAPSED.matches(event):
-                    terminal.client.send(serialize(event))
+                    terminal._events_queue.put(event)
                 return event
 
-            def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
-            
-            def handle_events(self):
-                terminal._handle_ingoing_messages()
-                super().handle_events()
-            
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
-                pong.override(status)
+            def on_paddle_move(self, pong: Pong, paddle_index: Direction, direction: Direction):
+                pong.move_paddle(paddle_index, direction)
+
+            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None): # type: ignore[override]
+                if status is None:
+                    pong.update(dt)
+                else:
+                    pong.override(status, update_server_state=True)
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
-        
+
         return Controller(terminal.pong, paddle_commands)
-    
+
     def _handle_ingoing_messages(self):
-        if self.running:
+        while self.running:
             message = self.client.receive()
             message = deserialize(message)
             assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
             pygame.event.post(message)
+
+    def _process_message_queue(self):
+        while self.running:
+            try:
+                # Get event from the queue
+                event = self._events_queue.get()
+                if event is None:
+                    break
+
+                # Send the event to the server
+                self.client.send(serialize(event))
+            except Exception as e:
+                print(f"Error sending packet: {e}")
+            finally:
+                self._events_queue.task_done()
 
     def before_run(self):
         super().before_run()
