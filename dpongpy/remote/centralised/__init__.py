@@ -107,6 +107,7 @@ class PongTerminal(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
+        self._local_pong = self.pong.clone()
 
     def create_controller(terminal, paddle_commands = None):
         from dpongpy.controller.local import PongInputHandler, EventHandler
@@ -122,14 +123,26 @@ class PongTerminal(PongGame):
                 return event
 
             def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
+                inputs = self.collect_inputs()
+                for input_event in inputs:
+                    self._apply_input_to_speculative_state(input_event)
+                super().handle_inputs(dt)
             
             def handle_events(self):
                 terminal._handle_ingoing_messages()
                 super().handle_events()
+
+            def _apply_input_to_speculative_state(self, input_event):
+                # Update the speculative local state based on input events
+                if input_event == ControlEvent.MOVE_UP:
+                    terminal._local_pong.move_paddle(Direction.UP)
+                elif input_event == ControlEvent.MOVE_DOWN:
+                    terminal._local_pong.move_paddle(Direction.DOWN)
             
             def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
                 pong.override(status)
+                terminal._local_pong.override(status)
+
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
@@ -152,6 +165,10 @@ class PongTerminal(PongGame):
         self.client.close()
         super().after_run()
 
+    def at_each_run(self):
+        self.view.render(self._local_pong)
+
+
 
 def main_coordinator(settings = None):
     PongCoordinator(settings).run()
@@ -159,3 +176,4 @@ def main_coordinator(settings = None):
 
 def main_terminal(settings = None):
     PongTerminal(settings).run()
+
