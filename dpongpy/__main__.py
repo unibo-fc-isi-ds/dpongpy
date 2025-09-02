@@ -22,6 +22,7 @@ def arg_parser():
                       choices=dpongpy.controller.ActionMap.all_mappings().keys(),
                       help="Keymaps for sides", action="append", default=None)
     game.add_argument("--debug", '-d', help="Enable debug mode", action="store_true")
+    game.add_argument("--delay", '-D', help="Enable synchronization delay", action="store_true")
     game.add_argument("--size", '-S', help="Size of the game window", type=int, nargs=2, default=[900, 600])
     game.add_argument("--fps", '-f', help="Frames per second", type=int, default=60)
     game.add_argument("--no-gui", help="Disable GUI", action="store_true", default=False)
@@ -33,6 +34,7 @@ def args_to_settings(args):
     settings.host = args.host
     settings.port = args.port
     settings.debug = args.debug
+    settings.delay = args.delay
     settings.size = tuple(args.size)
     settings.fps = args.fps
     if args.keys is None:
