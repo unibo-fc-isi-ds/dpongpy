@@ -107,37 +107,44 @@ class PongTerminal(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
+        self._thread_receiver = threading.Thread(target=self._handle_ingoing_messages, daemon=True)
+        self._thread_receiver.start()
 
-    def create_controller(terminal, paddle_commands = None):
+    def create_controller(self_terminal, paddle_commands = None):
         from dpongpy.controller.local import PongInputHandler, EventHandler
 
         class Controller(PongInputHandler, EventHandler):
-            def __init__(self, pong: Pong, paddle_commands):
-                PongInputHandler.__init__(self, pong, paddle_commands)
+            def __init__(self_controller, pong: Pong, paddle_commands):
+                PongInputHandler.__init__(self_controller, pong, paddle_commands)
 
-            def post_event(self, event: Event | ControlEvent, **kwargs):
+            def post_event(self_controller, event: Event | ControlEvent, **kwargs):
                 event = super().post_event(event, **kwargs)
                 if not ControlEvent.TIME_ELAPSED.matches(event):
-                    terminal.client.send(serialize(event))
+                    self_terminal.client.send(serialize(event))
                 return event
 
-            def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
+            def handle_inputs(self_controller, dt=None):
+                return super().handle_inputs(dt)
             
-            def handle_events(self):
-                terminal._handle_ingoing_messages()
+            def on_paddle_move(self_controller, pong: Pong, paddle_index, direction):
+                pong.move_paddle(paddle_index, direction)             
+            
+            def handle_events(self_controller):
                 super().handle_events()
             
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
-                pong.override(status)
+            def on_time_elapsed(self_controller, pong: Pong, dt: float, status: Pong = None):
+                if status is not None:
+                    pong.override(status)
+                else:
+                    pong.update(dt)
 
-            def on_player_leave(self, pong: Pong, paddle_index: Direction):
-                terminal.stop()
+            def on_player_leave(self_controller, pong: Pong, paddle_index: Direction):
+                self_terminal.stop()
         
-        return Controller(terminal.pong, paddle_commands)
+        return Controller(self_terminal.pong, paddle_commands)
     
     def _handle_ingoing_messages(self):
-        if self.running:
+        while self.running:
             message = self.client.receive()
             message = deserialize(message)
             assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
