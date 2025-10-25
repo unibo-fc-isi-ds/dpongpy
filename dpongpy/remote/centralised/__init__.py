@@ -1,3 +1,4 @@
+import typing
 from pygame.event import Event
 import pygame
 from dpongpy import PongGame, Settings
@@ -107,6 +108,9 @@ class PongTerminal(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
+        self.events_thread = threading.Thread(
+            target=self._handle_ingoing_messages, 
+        )
 
     def create_controller(terminal, paddle_commands = None):
         from dpongpy.controller.local import PongInputHandler, EventHandler
@@ -124,10 +128,6 @@ class PongTerminal(PongGame):
             def handle_inputs(self, dt=None):
                 return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
             
-            def handle_events(self):
-                terminal._handle_ingoing_messages()
-                super().handle_events()
-            
             def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
                 pong.override(status)
 
@@ -136,17 +136,19 @@ class PongTerminal(PongGame):
         
         return Controller(terminal.pong, paddle_commands)
     
-    def _handle_ingoing_messages(self):
-        if self.running:
-            message = self.client.receive()
-            message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-            pygame.event.post(message)
+    def _handle_ingoing_messages(self) -> typing.NoReturn:
+        while True:
+            if self.running:
+                message = self.client.receive()
+                message = deserialize(message)
+                assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+                pygame.event.post(message)
 
     def before_run(self):
         super().before_run()
         for paddle in self.pong.paddles:
             self.controller.post_event(ControlEvent.PLAYER_JOIN, paddle_index=paddle.side)
+        self.events_thread.start()
 
     def after_run(self):
         self.client.close()
