@@ -122,14 +122,15 @@ class PongTerminal(PongGame):
                 return event
 
             def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
+                super().handle_inputs(dt)
             
             def handle_events(self):
                 terminal._handle_ingoing_messages()
                 super().handle_events()
             
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
-                pong.override(status)
+            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong | None = None): # type: ignore[override]
+                if status is not None:
+                    pong.override(status)
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
@@ -137,8 +138,10 @@ class PongTerminal(PongGame):
         return Controller(terminal.pong, paddle_commands)
     
     def _handle_ingoing_messages(self):
-        if self.running:
+        while self.running:
             message = self.client.receive()
+            if message is None:
+                break
             message = deserialize(message)
             assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
             pygame.event.post(message)
