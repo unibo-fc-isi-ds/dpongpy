@@ -7,6 +7,7 @@ from dpongpy.model import Direction, Pong
 from dpongpy.remote.udp import UdpClient, UdpServer, Address
 from dpongpy.remote.presentation import serialize, deserialize
 import threading
+import time
 
 
 DEFAULT_HOST = "localhost"
@@ -14,7 +15,7 @@ DEFAULT_PORT = 12345
 
 
 class PongCoordinator(PongGame):
-
+    
     def __init__(self, settings: Settings = None):
         settings = settings or Settings()
         settings.initial_paddles = []
@@ -94,11 +95,13 @@ class PongCoordinator(PongGame):
                 continue
             self.server.send(payload=event, address=peer)
 
+    
 
     def _handle_ingoing_messages(self):
         while self.running:
             message, sender = self.server.receive()
             if message is None or sender is None:
+                time.sleep(0.001)
                 continue
             message = deserialize(message)
             assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
