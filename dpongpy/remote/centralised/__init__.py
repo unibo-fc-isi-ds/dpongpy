@@ -139,6 +139,8 @@ class PongTerminal(PongGame):
     def _handle_ingoing_messages(self):
         if self.running:
             message = self.client.receive()
+            if message is None:
+                return
             message = deserialize(message)
             assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
             pygame.event.post(message)
