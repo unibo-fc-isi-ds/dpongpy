@@ -168,7 +168,6 @@ class PongTerminal(PongGame):
         for paddle in self.pong.paddles:
             for _ in range(10):
                 self.controller.post_event(ControlEvent.PLAYER_JOIN, paddle_index=paddle.side)
-                self.pong.reset_ball() 
 
     def after_run(self):
         self.client.close()
