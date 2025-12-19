@@ -98,6 +98,7 @@ class PongCoordinator(PongGame):
             assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
             pygame.event.post(message)
 
+#COME RICHIESTO DALL'ESERCIZIO NON TOCCO IL COORDINATOR MA SOLO IL TERMINAL
 
 class PongTerminal(PongGame):
 
@@ -107,6 +108,27 @@ class PongTerminal(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
+        self.latest_remote_status = None #AGGIUNTA MIA, memorizzo l'ultimo stato remoto
+        self.receiver_running = True #AGGIUNTA MIA, controllo il thread di ricezione
+        threading.Thread(  #AGGIUNTA MIA
+            target=self._receiver_loop,
+            daemon=True
+        ).start()
+
+    def create_view(terminal): #AGGIUNTA MIA, creo la view per il terminal
+        from dpongpy.view import ScreenPongView
+        from dpongpy.controller.local import ControlEvent
+
+        class LocalStepView(ScreenPongView):
+            def render(self):
+                super().render()
+                evt = terminal.controller.create_event(
+                    ControlEvent.TIME_ELAPSED,
+                    dt=terminal.dt
+                )
+                pygame.event.post(evt)
+
+        return LocalStepView(terminal.pong, debug=True)
 
     def create_controller(terminal, paddle_commands = None):
         from dpongpy.controller.local import PongInputHandler, EventHandler
@@ -122,26 +144,33 @@ class PongTerminal(PongGame):
                 return event
 
             def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
-            
+                return super().handle_inputs(dt=None) #AGGIUNTA MIA, ora TIME_ELAPSED viene generato,la fisica avanza localmente e il gioco resta fluido
+
             def handle_events(self):
-                terminal._handle_ingoing_messages()
+                #terminal._handle_ingoing_messages()   #AGGIUNTA MIA, RIMUOVO. INUTILE
                 super().handle_events()
-            
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
-                pong.override(status)
+
+            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None): # type: ignore[override] #AGGIUNTA MIA, lieve modifica
+                if status is not None:
+                    pong.override(status)
+                else:
+                    pong.update(dt)
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
-        
         return Controller(terminal.pong, paddle_commands)
-    
-    def _handle_ingoing_messages(self):
-        if self.running:
-            message = self.client.receive()
-            message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-            pygame.event.post(message)
+
+    def _handle_ingoing_messages(self):    #LO RIMUOVO E' PROBLEMATICO
+        pass
+
+    def _receiver_loop(self): #AGGIUNTA MIA, può bloccarsi lui ma cosi non blocco mai il game loop
+        while self.receiver_running:
+            try:
+                message = self.client.receive()
+                event = deserialize(message)
+                pygame.event.post(event)
+            except:
+                pass
 
     def before_run(self):
         super().before_run()
@@ -149,6 +178,7 @@ class PongTerminal(PongGame):
             self.controller.post_event(ControlEvent.PLAYER_JOIN, paddle_index=paddle.side)
 
     def after_run(self):
+        self.receiver_running = False #AGGIUNTA MIA
         self.client.close()
         super().after_run()
 
