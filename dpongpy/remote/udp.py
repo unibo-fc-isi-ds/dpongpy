@@ -15,6 +15,7 @@ def udp_socket(bind_to: Address | int = Address.any_local_port()) -> socket.sock
     if isinstance(bind_to, int):
         bind_to = Address.localhost(bind_to)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setblocking(False) 
     if bind_to is not None:
         sock.bind(bind_to.as_tuple()) # type: ignore[union-attr]
         logger.debug(f"Bind UDP socket to {sock.getsockname()}")
@@ -36,7 +37,10 @@ def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
 
 
 def udp_receive(sock: socket.socket, decode=True) -> tuple[str | bytes | None, Address | None]:
-    payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+    try:
+        payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+    except BlockingIOError:
+        return None, None # To not block 
     address = Address(*address)
     logger.debug(f"Received {len(payload)} bytes from {address}: {payload!r}")
     if decode:
