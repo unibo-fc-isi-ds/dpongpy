@@ -122,23 +122,39 @@ class PongTerminal(PongGame):
                 return event
 
             def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
+                return super().handle_inputs(dt)
             
             def handle_events(self):
                 terminal._handle_ingoing_messages()
                 super().handle_events()
+
+            def on_paddle_move(self, pong: Pong, paddle_index: Direction, direction: Direction):
+                pong.move_paddle(paddle_index, direction)
             
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
-                pong.override(status)
+            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None): # type: ignore[override]
+                if status is not None:
+                    pong.override(status)
+                else:
+                    pong.update(dt)
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
         
         return Controller(terminal.pong, paddle_commands)
-    
+
+    def _receive_all(self):
+        # This while can be confusing, if client is not blocking makes sense: READ ALL MESSAGES, otherwise it does not!
+        while self.running:
+            try:
+                message = self.client.receive()
+            except (BlockingIOError):
+                break
+            if message is None:
+                break
+            yield message
+
     def _handle_ingoing_messages(self):
-        if self.running:
-            message = self.client.receive()
+        for message in self._receive_all():
             message = deserialize(message)
             assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
             pygame.event.post(message)
