@@ -110,6 +110,8 @@ class PongTerminal(PongGame):
         self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
         self._thread_receiver = threading.Thread(target=self._handle_ingoing_messages, daemon=True)
         self._thread_receiver.start()
+        self._lock = threading.RLock()
+        self._coordinator_informed = False
 
     def create_controller(terminal, paddle_commands = None):
         from dpongpy.controller.local import PongInputHandler, EventHandler
@@ -120,8 +122,11 @@ class PongTerminal(PongGame):
 
             def post_event(self, event: Event | ControlEvent, **kwargs):
                 event = super().post_event(event, **kwargs)
+                with terminal._lock:
+                    informed = terminal._coordinator_informed
                 if not ControlEvent.TIME_ELAPSED.matches(event):
-                    terminal.client.send(serialize(event))
+                    if informed or ControlEvent.PLAYER_JOIN.matches(event):
+                        terminal.client.send(serialize(event))
                 return event
 
             def handle_inputs(self, dt=None):
@@ -150,6 +155,9 @@ class PongTerminal(PongGame):
                 message = deserialize(message)
                 assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
                 pygame.event.post(message)
+                with self._lock:
+                    if not self._coordinator_informed:
+                        self._coordinator_informed = True
 
     def before_run(self):
         super().before_run()
