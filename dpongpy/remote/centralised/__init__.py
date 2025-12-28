@@ -93,10 +93,11 @@ class PongCoordinator(PongGame):
     def _handle_ingoing_messages(self):
         while self.running:
             message, sender = self.server.receive()
-            self.add_peer(sender)
-            message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-            pygame.event.post(message)
+            if message is not None:
+                self.add_peer(sender)
+                message = deserialize(message)
+                assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+                pygame.event.post(message)
 
 
 class PongTerminal(PongGame):
@@ -145,9 +146,10 @@ class PongTerminal(PongGame):
     def _handle_ingoing_messages(self):
         while self.running:
             message = self.client.receive()
-            message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-            pygame.event.post(message)
+            if message is not None:
+                message = deserialize(message)
+                assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+                pygame.event.post(message)
 
     def before_run(self):
         super().before_run()
