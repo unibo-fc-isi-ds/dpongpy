@@ -15,6 +15,7 @@ def udp_socket(bind_to: Address | int = Address.any_local_port()) -> socket.sock
     if isinstance(bind_to, int):
         bind_to = Address.localhost(bind_to)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setblocking(False) #AGGIUNTA MIA, rendo il socket non bloccante
     if bind_to is not None:
         sock.bind(bind_to.as_tuple()) # type: ignore[union-attr]
         logger.debug(f"Bind UDP socket to {sock.getsockname()}")
@@ -36,7 +37,10 @@ def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
 
 
 def udp_receive(sock: socket.socket, decode=True) -> tuple[str | bytes | None, Address | None]:
-    payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+    try:
+        payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+    except BlockingIOError:
+        return None,None #AGGIUNTA MIA
     address = Address(*address)
     logger.debug(f"Received {len(payload)} bytes from {address}: {payload!r}")
     if decode:
@@ -74,13 +78,16 @@ class UdpSession(Session):
                 payload = payload.decode()
             self._first_message = None
             return payload
+
         payload, address = udp_receive(self._socket, decode)
-        if address is not None:
-            if self._received_messages == 0:
-                self._remote_address = address
+        if payload is None:
+            return None
+
+        if self._received_messages == 0:
+            self._remote_address = address
+        else:
             assert address.equivalent_to(self.remote_address), f"Received packet from unexpected party {address}"
-            return payload
-        return None
+        return payload
 
     def close(self):
         self._socket.close()

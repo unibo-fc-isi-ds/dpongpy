@@ -1,5 +1,6 @@
 from pygame.event import Event
 import pygame
+import time
 from dpongpy import PongGame, Settings
 from dpongpy.model import *
 from dpongpy.controller import ControlEvent
@@ -115,20 +116,10 @@ class PongTerminal(PongGame):
             daemon=True
         ).start()
 
-    def create_view(terminal): #AGGIUNTA MIA, creo la view per il terminal
+    def create_view(terminal):
         from dpongpy.view import ScreenPongView
-        from dpongpy.controller.local import ControlEvent
+        return ScreenPongView(terminal.pong, debug=True)
 
-        class LocalStepView(ScreenPongView):
-            def render(self):
-                super().render()
-                evt = terminal.controller.create_event(
-                    ControlEvent.TIME_ELAPSED,
-                    dt=terminal.dt
-                )
-                pygame.event.post(evt)
-
-        return LocalStepView(terminal.pong, debug=True)
 
     def create_controller(terminal, paddle_commands = None):
         from dpongpy.controller.local import PongInputHandler, EventHandler
@@ -144,7 +135,12 @@ class PongTerminal(PongGame):
                 return event
 
             def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt=None) #AGGIUNTA MIA, ora TIME_ELAPSED viene generato,la fisica avanza localmente e il gioco resta fluido
+                evt = self.create_event(
+                    ControlEvent.TIME_ELAPSED,
+                    dt=dt
+                )
+                pygame.event.post(evt)
+                return super().handle_inputs(dt=None) #AGGIUNTA MIA, genero TIME_ELAPSED LOCALE
 
             def handle_events(self):
                 #terminal._handle_ingoing_messages()   #AGGIUNTA MIA, RIMUOVO. INUTILE
@@ -163,14 +159,14 @@ class PongTerminal(PongGame):
     def _handle_ingoing_messages(self):    #LO RIMUOVO E' PROBLEMATICO
         pass
 
-    def _receiver_loop(self): #AGGIUNTA MIA, può bloccarsi lui ma cosi non blocco mai il game loop
+    def _receiver_loop(self): #AGGIUNTA MIA, nessun blocco
         while self.receiver_running:
-            try:
-                message = self.client.receive()
-                event = deserialize(message)
-                pygame.event.post(event)
-            except:
-                pass
+            message = self.client.receive()
+            if message is None:
+                time.sleep(0.001)
+                continue
+            event = deserialize(message)
+            pygame.event.post(event)
 
     def before_run(self):
         super().before_run()
