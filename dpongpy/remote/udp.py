@@ -15,7 +15,6 @@ def udp_socket(bind_to: Address | int = Address.any_local_port()) -> socket.sock
     if isinstance(bind_to, int):
         bind_to = Address.localhost(bind_to)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setblocking(False) #AGGIUNTA MIA, rendo il socket non bloccante
     if bind_to is not None:
         sock.bind(bind_to.as_tuple()) # type: ignore[union-attr]
         logger.debug(f"Bind UDP socket to {sock.getsockname()}")
@@ -135,4 +134,6 @@ class UdpServer(Server):
 
 class UdpClient(UdpSession):
     def __init__(self, remote_address: Address):
+        sock = udp_socket()
+        sock.setblocking(False)
         super().__init__(udp_socket(), remote_address)
