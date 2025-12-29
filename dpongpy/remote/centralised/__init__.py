@@ -62,7 +62,6 @@ class PongCoordinator(PongGame):
 
             def handle_inputs(self, dt=None):
                 self.time_elapsed(dt)
-
         return Controller(coordinator.pong)
 
     def at_each_run(self):
@@ -93,13 +92,15 @@ class PongCoordinator(PongGame):
 
     def _handle_ingoing_messages(self):
         while self.running:
-            message, sender = self.server.receive()
-            self.add_peer(sender)
-            message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-            pygame.event.post(message)
-
-#COME RICHIESTO DALL'ESERCIZIO NON TOCCO IL COORDINATOR MA SOLO IL TERMINAL
+            try:
+                message, sender = self.server.receive()
+                if message is None: continue
+                self.add_peer(sender)
+                event = deserialize(message)
+                pygame.event.post(event)
+            except Exception as e:
+                if not self.running: break
+                logger.error(f"Errore ricezione: {e}")
 
 class PongTerminal(PongGame):
 
@@ -122,11 +123,12 @@ class PongTerminal(PongGame):
 
 
     def create_controller(terminal, paddle_commands = None):
-        from dpongpy.controller.local import PongInputHandler, EventHandler
+        from dpongpy.controller.local import PongInputHandler, PongEventHandler
 
-        class Controller(PongInputHandler, EventHandler):
+        class Controller(PongInputHandler, PongEventHandler):
             def __init__(self, pong: Pong, paddle_commands):
                 PongInputHandler.__init__(self, pong, paddle_commands)
+                PongEventHandler.__init__(self, pong)
 
             def post_event(self, event: Event | ControlEvent, **kwargs):
                 event = super().post_event(event, **kwargs)
@@ -140,7 +142,7 @@ class PongTerminal(PongGame):
                     dt=dt
                 )
                 pygame.event.post(evt)
-                return super().handle_inputs(dt=None) #AGGIUNTA MIA, genero TIME_ELAPSED LOCALE
+                return super().handle_inputs(dt=None)
 
             def handle_events(self):
                 #terminal._handle_ingoing_messages()   #AGGIUNTA MIA, RIMUOVO. INUTILE
@@ -154,6 +156,11 @@ class PongTerminal(PongGame):
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
+
+            # All'interno di PongCoordinator.create_controller
+            def on_paddle_move(self, pong: Pong, paddle_index: Direction, direction: Direction):
+                super().on_paddle_move(pong, paddle_index, direction)
+
         return Controller(terminal.pong, paddle_commands)
 
     def _handle_ingoing_messages(self):    #LO RIMUOVO E' PROBLEMATICO
@@ -161,7 +168,10 @@ class PongTerminal(PongGame):
 
     def _receiver_loop(self): #AGGIUNTA MIA, nessun blocco
         while self.receiver_running:
-            message = self.client.receive()
+            try:
+                message = self.client.receive()
+            except OSError:
+                break #CHIUDO LA SOCKET
             if message is None:
                 time.sleep(0.001)
                 continue
@@ -171,10 +181,13 @@ class PongTerminal(PongGame):
     def before_run(self):
         super().before_run()
         for paddle in self.pong.paddles:
-            self.controller.post_event(ControlEvent.PLAYER_JOIN, paddle_index=paddle.side)
+            event = self.controller.create_event(ControlEvent.PLAYER_JOIN,paddle_index=paddle.side)
+            self.client.send(serialize(event))
+            self.pong.reset_ball()
 
     def after_run(self):
-        self.receiver_running = False #AGGIUNTA MIA
+        self.running = False
+        self.receiver_running = False
         self.client.close()
         super().after_run()
 
