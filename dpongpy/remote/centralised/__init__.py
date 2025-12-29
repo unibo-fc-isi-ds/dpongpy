@@ -21,6 +21,7 @@ class PongCoordinator(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.server = UdpServer(self.settings.port or DEFAULT_PORT)
+        self.server._socket.settimeout(0.1)
         self._thread_receiver = threading.Thread(target=self._handle_ingoing_messages, daemon=True)
         self._thread_receiver.start()
         self._peers: set[Address] = set()
@@ -88,15 +89,23 @@ class PongCoordinator(PongGame):
     def _broadcast_to_all_peers(self, message):
         event = serialize(message)
         for peer in self.peers:
-            self.server.send(payload=event, address=peer)
+            try:
+                self.server.send(payload=event, address=peer)
+            except OSError:
+                pass
 
     def _handle_ingoing_messages(self):
         while self.running:
-            message, sender = self.server.receive()
-            self.add_peer(sender)
-            message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-            pygame.event.post(message)
+            try:
+                message, sender = self.server.receive()
+                self.add_peer(sender)
+                message = deserialize(message)
+                assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+                pygame.event.post(message)
+            except TimeoutError:
+                continue
+            except OSError:
+                continue
 
 
 class PongTerminal(PongGame):
@@ -107,6 +116,7 @@ class PongTerminal(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
+        self.client._socket.settimeout(0.1)
         self._thread_receiver = threading.Thread(target=self._handle_ingoing_messages, daemon=True)
         self._thread_receiver.start()
 
@@ -129,7 +139,7 @@ class PongTerminal(PongGame):
             def handle_events(self):
                 super().handle_events()
             
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None): # type: ignore[override]
+            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None):
                 if status is not None:
                     pong.override(status)
                 else:
@@ -142,10 +152,15 @@ class PongTerminal(PongGame):
     
     def _handle_ingoing_messages(self):
         while self.running:
-            message = self.client.receive()
-            message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-            pygame.event.post(message)
+            try:
+                message = self.client.receive()
+                message = deserialize(message)
+                assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+                pygame.event.post(message)
+            except TimeoutError:
+                continue
+            except OSError:
+                continue
 
     def before_run(self):
         super().before_run()
