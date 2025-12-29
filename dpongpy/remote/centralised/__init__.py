@@ -1,5 +1,6 @@
 from pygame.event import Event
 import pygame
+import time
 from dpongpy import PongGame, Settings
 from dpongpy.model import *
 from dpongpy.controller import ControlEvent
@@ -61,7 +62,6 @@ class PongCoordinator(PongGame):
 
             def handle_inputs(self, dt=None):
                 self.time_elapsed(dt)
-
         return Controller(coordinator.pong)
 
     def at_each_run(self):
@@ -92,12 +92,15 @@ class PongCoordinator(PongGame):
 
     def _handle_ingoing_messages(self):
         while self.running:
-            message, sender = self.server.receive()
-            self.add_peer(sender)
-            message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-            pygame.event.post(message)
-
+            try:
+                message, sender = self.server.receive()
+                if message is None: continue
+                self.add_peer(sender)
+                event = deserialize(message)
+                pygame.event.post(event)
+            except Exception as e:
+                if not self.running: break
+                logger.error(f"Errore ricezione: {e}")
 
 class PongTerminal(PongGame):
 
@@ -107,13 +110,25 @@ class PongTerminal(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
+        self.latest_remote_status = None #AGGIUNTA MIA, memorizzo l'ultimo stato remoto
+        self.receiver_running = True #AGGIUNTA MIA, controllo il thread di ricezione
+        threading.Thread(  #AGGIUNTA MIA
+            target=self._receiver_loop,
+            daemon=True
+        ).start()
+
+    def create_view(terminal):
+        from dpongpy.view import ScreenPongView
+        return ScreenPongView(terminal.pong, debug=True)
+
 
     def create_controller(terminal, paddle_commands = None):
-        from dpongpy.controller.local import PongInputHandler, EventHandler
+        from dpongpy.controller.local import PongInputHandler, PongEventHandler
 
-        class Controller(PongInputHandler, EventHandler):
+        class Controller(PongInputHandler, PongEventHandler):
             def __init__(self, pong: Pong, paddle_commands):
                 PongInputHandler.__init__(self, pong, paddle_commands)
+                PongEventHandler.__init__(self, pong)
 
             def post_event(self, event: Event | ControlEvent, **kwargs):
                 event = super().post_event(event, **kwargs)
@@ -122,33 +137,57 @@ class PongTerminal(PongGame):
                 return event
 
             def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
-            
+                evt = self.create_event(
+                    ControlEvent.TIME_ELAPSED,
+                    dt=dt
+                )
+                pygame.event.post(evt)
+                return super().handle_inputs(dt=None)
+
             def handle_events(self):
-                terminal._handle_ingoing_messages()
+                #terminal._handle_ingoing_messages()   #AGGIUNTA MIA, RIMUOVO. INUTILE
                 super().handle_events()
-            
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
-                pong.override(status)
+
+            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None): # type: ignore[override] #AGGIUNTA MIA, lieve modifica
+                if status is not None:
+                    pong.override(status)
+                else:
+                    pong.update(dt)
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
-        
+
+            # All'interno di PongCoordinator.create_controller
+            def on_paddle_move(self, pong: Pong, paddle_index: Direction, direction: Direction):
+                super().on_paddle_move(pong, paddle_index, direction)
+
         return Controller(terminal.pong, paddle_commands)
-    
-    def _handle_ingoing_messages(self):
-        if self.running:
-            message = self.client.receive()
-            message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-            pygame.event.post(message)
+
+    def _handle_ingoing_messages(self):    #LO RIMUOVO E' PROBLEMATICO
+        pass
+
+    def _receiver_loop(self): #AGGIUNTA MIA, nessun blocco
+        while self.receiver_running:
+            try:
+                message = self.client.receive()
+            except OSError:
+                break #CHIUDO LA SOCKET
+            if message is None:
+                time.sleep(0.001)
+                continue
+            event = deserialize(message)
+            pygame.event.post(event)
 
     def before_run(self):
         super().before_run()
         for paddle in self.pong.paddles:
-            self.controller.post_event(ControlEvent.PLAYER_JOIN, paddle_index=paddle.side)
+            event = self.controller.create_event(ControlEvent.PLAYER_JOIN,paddle_index=paddle.side)
+            self.client.send(serialize(event))
+            self.pong.reset_ball()
 
     def after_run(self):
+        self.running = False
+        self.receiver_running = False
         self.client.close()
         super().after_run()
 
