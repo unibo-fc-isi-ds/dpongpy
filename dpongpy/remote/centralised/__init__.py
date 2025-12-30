@@ -107,6 +107,10 @@ class PongTerminal(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
+        self._thread_receiver = threading.Thread(target=self._handle_ingoing_messages_async, daemon=True)
+        self._thread_receiver.start()
+        self._received_updates = []
+        self._lock = threading.RLock()
 
     def create_controller(terminal, paddle_commands = None):
         from dpongpy.controller.local import PongInputHandler, EventHandler
@@ -122,25 +126,51 @@ class PongTerminal(PongGame):
                 return event
 
             def handle_inputs(self, dt=None):
+                if dt is not None:
+                    self.post_event(ControlEvent.TIME_ELAPSED, dt=dt)
+                    print(dt)
                 return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
             
             def handle_events(self):
-                terminal._handle_ingoing_messages()
+                terminal._process_received_updates()
                 super().handle_events()
             
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
-                pong.override(status)
+            def on_paddle_move(self, pong, paddle_index, direction):
+                return pong.move_paddle(paddle_index, direction)
+            
+            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None):             
+                if status is None:
+                    pong.update(dt)
+                else:
+                    pong.override(status)
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
         
         return Controller(terminal.pong, paddle_commands)
     
-    def _handle_ingoing_messages(self):
-        if self.running:
-            message = self.client.receive()
-            message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+    def _handle_ingoing_messages_async(self):
+        while self.running:
+            try:
+                message = self.client.receive()
+                message = deserialize(message)
+                assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+                    
+                with self._lock:
+                    self._received_updates.append(message)         
+            except Exception as e:
+                if self.running:
+                    print(f"Error receiving: {e}")
+                break
+
+    def _process_received_updates(self):
+        updates_to_process = []
+        with self._lock:
+            if self._received_updates:
+                updates_to_process = self._received_updates
+                self._received_updates = []
+
+        for message in updates_to_process:
             pygame.event.post(message)
 
     def before_run(self):
