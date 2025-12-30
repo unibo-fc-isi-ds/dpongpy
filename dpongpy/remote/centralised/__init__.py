@@ -47,7 +47,18 @@ class PongCoordinator(PongGame):
             def on_player_join(self, pong: Pong, paddle_index: Direction):
                 super().on_player_join(pong, paddle_index)
                 pong.reset_ball()
+                
+            def on_paddle_move(self, pong: Pong, paddle_index: Direction, direction: Direction):
 
+                ### 
+                # Assuming possible network failures, simulated by setting UDP_DROP_RATE = 0.4, this method makes sure the 
+                #coordinator does not crash if the packet containing the player.join information is lost (which is highly probable with a drop rate of 0.4)
+                ###
+
+                if not pong.has_paddle(paddle_index):
+                    return  
+                pong.move_paddle(paddle_index, direction)
+            
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 if pong.has_paddle(paddle_index):
                     pong.remove_paddle(paddle_index)
@@ -107,6 +118,20 @@ class PongTerminal(PongGame):
         super().__init__(settings)
         self.pong.reset_ball(Vector2(0))
         self.client = UdpClient(Address(self.settings.host or DEFAULT_HOST, self.settings.port or DEFAULT_PORT))
+        self._thread_receiver = threading.Thread(target=self._handle_ingoing_messages, daemon=True)
+        self._thread_receiver.start()
+
+    def create_view(terminal):
+        from dpongpy.view import ScreenPongView
+        from dpongpy.controller.local import ControlEvent
+
+        class SpeculativePongView(ScreenPongView): #in order to render the right view, the class needs to extend the ScreenPongView class, not the ShowNothingView class like in the Coordinator
+            def render(self):
+                super().render()
+                event = terminal.controller.create_event(ControlEvent.TIME_ELAPSED, dt=terminal.dt) # SPECULATIVE EXECUTION: the status is not included, allowing the controller local update
+                pygame.event.post(event)
+
+        return SpeculativePongView(terminal.pong, debug=True)
 
     def create_controller(terminal, paddle_commands = None):
         from dpongpy.controller.local import PongInputHandler, EventHandler
@@ -125,11 +150,14 @@ class PongTerminal(PongGame):
                 return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
             
             def handle_events(self):
-                terminal._handle_ingoing_messages()
+                #messages reception is run by the thread, so we just need to process the events in the Pygame queue.
                 super().handle_events()
             
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
-                pong.override(status)
+            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None): # type: ignore[override]
+                if status:
+                    pong.override(status)
+                else:
+                    pong.update(dt)
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
@@ -137,7 +165,7 @@ class PongTerminal(PongGame):
         return Controller(terminal.pong, paddle_commands)
     
     def _handle_ingoing_messages(self):
-        if self.running:
+        while self.running:
             message = self.client.receive()
             message = deserialize(message)
             assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
@@ -145,6 +173,9 @@ class PongTerminal(PongGame):
 
     def before_run(self):
         super().before_run()
+        if not pygame.display.get_surface(): #required before using Pygame.event
+            pygame.init()
+            pygame.display.set_mode(self.settings.size)
         for paddle in self.pong.paddles:
             self.controller.post_event(ControlEvent.PLAYER_JOIN, paddle_index=paddle.side)
 
