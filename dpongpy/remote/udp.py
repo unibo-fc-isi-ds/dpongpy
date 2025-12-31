@@ -42,7 +42,7 @@ def udp_receive(sock: socket.socket, decode=True, timeout: float | None = None) 
         ready, ignore1, ignore2 = select.select([sock], [], [], timeout)
         if not ready:
             return None, None
-    payload, address = ready[0].recvfrom(THRESHOLD_DGRAM_SIZE)
+    payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
     address = Address(*address)
     logger.debug(f"Received {len(payload)} bytes from {address}: {payload!r}")
     if decode:
