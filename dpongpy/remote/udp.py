@@ -11,21 +11,28 @@ if UDP_DROP_RATE > 0:
     logger.warning(f"Drop rate for outgoing UDP messages is {UDP_DROP_RATE}")
 
 
-def udp_socket(bind_to: Address | int = Address.any_local_port()) -> socket.socket:
+def udp_socket(bind_to: Address | int = Address.any_local_port(), timeout: float | None = None) -> socket.socket:
+    """
+    timeout=None  -> blocking
+    timeout=float -> recvfrom aspetta al max most il n di sec passati dentro timeout """
     if isinstance(bind_to, int):
         bind_to = Address.localhost(bind_to)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    if timeout is not None:
+        sock.settimeout(timeout)
     if bind_to is not None:
-        sock.bind(bind_to.as_tuple()) # type: ignore[union-attr]
+        sock.bind(bind_to.as_tuple())  # type: ignore[union-attr]
         logger.debug(f"Bind UDP socket to {sock.getsockname()}")
     return sock
 
 
-def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
+def udp_send(sock: socket.socket, address: Address, payload: bytes | str) -> int:
     if isinstance(payload, str):
         payload = payload.encode()
     if len(payload) > THRESHOLD_DGRAM_SIZE:
-        raise ValueError(f"Payload size must be less than {THRESHOLD_DGRAM_SIZE} bytes ({THRESHOLD_DGRAM_SIZE / 1024} KiB)")
+        raise ValueError(
+            f"Payload size must be less than {THRESHOLD_DGRAM_SIZE} bytes ({THRESHOLD_DGRAM_SIZE / 1024} KiB)"
+        )
     if random.uniform(0, 1) < UDP_DROP_RATE:
         result = len(payload)
         logger.warning(f"Pretend to send {result} bytes to {address}: {payload!r}")
@@ -36,12 +43,15 @@ def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
 
 
 def udp_receive(sock: socket.socket, decode=True) -> tuple[str | bytes | None, Address | None]:
-    payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
-    address = Address(*address)
-    logger.debug(f"Received {len(payload)} bytes from {address}: {payload!r}")
-    if decode:
-        payload = payload.decode() # type: ignore[assignment]
-    return payload, address
+    try:
+        payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+        address = Address(*address)
+        logger.debug(f"Received {len(payload)} bytes from {address}: {payload!r}")
+        if decode:
+            payload = payload.decode()  # type: ignore[assignment]
+        return payload, address
+    except (socket.timeout, BlockingIOError, ConnectionResetError, OSError):
+        return None, None
 
 
 class UdpSession(Session):
@@ -128,4 +138,5 @@ class UdpServer(Server):
 
 class UdpClient(UdpSession):
     def __init__(self, remote_address: Address):
-        super().__init__(udp_socket(), remote_address)
+        # basso timeout
+        super().__init__(udp_socket(timeout=0.02), remote_address)
