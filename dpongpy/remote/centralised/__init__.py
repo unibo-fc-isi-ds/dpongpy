@@ -88,11 +88,15 @@ class PongCoordinator(PongGame):
     def _broadcast_to_all_peers(self, message):
         event = serialize(message)
         for peer in self.peers:
+            if peer is None:
+                continue
             self.server.send(payload=event, address=peer)
 
     def _handle_ingoing_messages(self):
         while self.running:
             message, sender = self.server.receive()
+            if message is None or sender is None:
+                continue
             self.add_peer(sender)
             message = deserialize(message)
             assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
@@ -137,8 +141,12 @@ class PongTerminal(PongGame):
         return Controller(terminal.pong, paddle_commands)
     
     def _handle_ingoing_messages(self):
-        if self.running:
+        if not self.running:
+            return
+        while True:
             message = self.client.receive()
+            if not message:
+                break
             message = deserialize(message)
             assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
             pygame.event.post(message)
