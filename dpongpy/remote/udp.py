@@ -36,7 +36,10 @@ def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
 
 
 def udp_receive(sock: socket.socket, decode=True) -> tuple[str | bytes | None, Address | None]:
-    payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+    try:
+        payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+    except BlockingIOError:
+        return None, None
     address = Address(*address)
     logger.debug(f"Received {len(payload)} bytes from {address}: {payload!r}")
     if decode:
@@ -129,3 +132,4 @@ class UdpServer(Server):
 class UdpClient(UdpSession):
     def __init__(self, remote_address: Address):
         super().__init__(udp_socket(), remote_address)
+        self._socket.setblocking(False)

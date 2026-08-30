@@ -66,6 +66,7 @@ class PongCoordinator(PongGame):
 
     def at_each_run(self):
         pass
+        #pygame.time.delay(16)  # to avoid busy waiting
 
     def after_run(self):
         super().after_run()
@@ -122,7 +123,7 @@ class PongTerminal(PongGame):
                 return event
 
             def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
+                super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
             
             def handle_events(self):
                 terminal._handle_ingoing_messages()
@@ -137,8 +138,12 @@ class PongTerminal(PongGame):
         return Controller(terminal.pong, paddle_commands)
     
     def _handle_ingoing_messages(self):
-        if self.running:
+        if not self.running:
+            return
+        while True:
             message = self.client.receive()
+            if message is None:
+                break
             message = deserialize(message)
             assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
             pygame.event.post(message)
