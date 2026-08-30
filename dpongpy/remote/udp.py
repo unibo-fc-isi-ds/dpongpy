@@ -36,7 +36,11 @@ def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
 
 
 def udp_receive(sock: socket.socket, decode=True) -> tuple[str | bytes | None, Address | None]:
-    payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+    try:
+        payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+    except ConnectionResetError:
+        return None, None
+
     address = Address(*address)
     logger.debug(f"Received {len(payload)} bytes from {address}: {payload!r}")
     if decode:
