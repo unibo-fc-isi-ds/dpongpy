@@ -5,7 +5,7 @@ import random
 
 
 THRESHOLD_DGRAM_SIZE = 65536
-UDP_DROP_RATE = float(os.environ.get("UDP_DROP_RATE", 0.0))
+UDP_DROP_RATE = float(os.environ.get("UDP_DROP_RATE", 0.5))
 assert 0 <= UDP_DROP_RATE < 1, "Drop rate for outgoing UDP messages must be between 0 (included) and 1 (excluded)"
 if UDP_DROP_RATE > 0:
     logger.warning(f"Drop rate for outgoing UDP messages is {UDP_DROP_RATE}")
