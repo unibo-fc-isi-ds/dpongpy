@@ -11,10 +11,11 @@ if UDP_DROP_RATE > 0:
     logger.warning(f"Drop rate for outgoing UDP messages is {UDP_DROP_RATE}")
 
 
-def udp_socket(bind_to: Address | int = Address.any_local_port()) -> socket.socket:
+def udp_socket(bind_to: Address | int = Address.any_local_port(), blocking=False) -> socket.socket:
     if isinstance(bind_to, int):
         bind_to = Address.localhost(bind_to)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setblocking(blocking)
     if bind_to is not None:
         sock.bind(bind_to.as_tuple()) # type: ignore[union-attr]
         logger.debug(f"Bind UDP socket to {sock.getsockname()}")
@@ -36,11 +37,15 @@ def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
 
 
 def udp_receive(sock: socket.socket, decode=True) -> tuple[str | bytes | None, Address | None]:
-    payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+    try:
+        payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
+    except (ConnectionResetError, BlockingIOError):
+        return None, None
+    
     address = Address(*address)
     logger.debug(f"Received {len(payload)} bytes from {address}: {payload!r}")
     if decode:
-        payload = payload.decode() # type: ignore[assignment]
+        payload = payload.decode() 
     return payload, address
 
 
@@ -128,4 +133,4 @@ class UdpServer(Server):
 
 class UdpClient(UdpSession):
     def __init__(self, remote_address: Address):
-        super().__init__(udp_socket(), remote_address)
+        super().__init__(udp_socket(blocking=False), remote_address)
