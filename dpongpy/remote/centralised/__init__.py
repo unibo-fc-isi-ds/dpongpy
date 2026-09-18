@@ -122,14 +122,25 @@ class PongTerminal(PongGame):
                 return event
 
             def handle_inputs(self, dt=None):
-                return super().handle_inputs(dt=None) # just handle input events, do not handle time elapsed
+                # Handle input events (non-blocking)
+                super().handle_inputs(dt=dt)
+                # Speculative execution: update local game state continuously
+                # This ensures the game never blocks and remains fluid
+                if dt is not None and dt > 0:
+                    pong.update(dt)
             
             def handle_events(self):
+                # Check for incoming messages from coordinator (non-blocking)
                 terminal._handle_ingoing_messages()
+                # Handle all events including TIME_ELAPSED from coordinator
                 super().handle_events()
             
-            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong): # type: ignore[override]
-                pong.override(status)
+            def on_time_elapsed(self, pong: Pong, dt: float, status: Pong = None): # type: ignore[override]
+                if status is not None:
+                    # Overwrite local speculative state with coordinator's authoritative state
+                    pong.override(status)
+                # If status is None, this is a local speculative update which was already
+                # handled in handle_inputs, so we don't need to do anything here
 
             def on_player_leave(self, pong: Pong, paddle_index: Direction):
                 terminal.stop()
@@ -139,9 +150,10 @@ class PongTerminal(PongGame):
     def _handle_ingoing_messages(self):
         if self.running:
             message = self.client.receive()
-            message = deserialize(message)
-            assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
-            pygame.event.post(message)
+            if message is not None:  # Non-blocking: message may be None if no data available
+                message = deserialize(message)
+                assert isinstance(message, pygame.event.Event), f"Expected {pygame.event.Event}, got {type(message)}"
+                pygame.event.post(message)
 
     def before_run(self):
         super().before_run()
