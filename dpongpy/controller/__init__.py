@@ -11,6 +11,7 @@ class ControlEvent(Enum):
     GAME_OVER = pygame.QUIT
     PADDLE_MOVE = pygame.event.custom_type()
     TIME_ELAPSED = pygame.event.custom_type()
+    HEARTBEAT = pygame.event.custom_type()
 
     @classmethod
     def all(cls) -> set['ControlEvent']:
@@ -159,6 +160,8 @@ class EventHandler:
                 self.on_paddle_move(self._pong, **event.dict)
             elif ControlEvent.TIME_ELAPSED.matches(event):
                 self.on_time_elapsed(self._pong, **event.dict)
+            elif ControlEvent.HEARTBEAT.matches(event):
+                self.on_heartbeat(self._pong, **event.dict)
 
     def on_player_join(self, pong: Pong, paddle_index: Direction):
         pass
@@ -176,4 +179,7 @@ class EventHandler:
         pass
 
     def on_time_elapsed(self, pong: Pong, dt: float):
+        pass
+
+    def on_heartbeat(self, pong: Pong, paddle_index: Direction, heartbeat_timestamp: int):
         pass
