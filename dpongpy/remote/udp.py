@@ -2,10 +2,12 @@ from dpongpy.log import logger
 from dpongpy.remote import *
 import os
 import random
+import select
 
 
 THRESHOLD_DGRAM_SIZE = 65536
 UDP_DROP_RATE = float(os.environ.get("UDP_DROP_RATE", 0.0))
+UDP_DROP_RATE = 0.1
 assert 0 <= UDP_DROP_RATE < 1, "Drop rate for outgoing UDP messages must be between 0 (included) and 1 (excluded)"
 if UDP_DROP_RATE > 0:
     logger.warning(f"Drop rate for outgoing UDP messages is {UDP_DROP_RATE}")
@@ -35,7 +37,11 @@ def udp_send(sock: socket.socket, address:Address, payload: bytes | str) -> int:
     return result
 
 
-def udp_receive(sock: socket.socket, decode=True) -> tuple[str | bytes | None, Address | None]:
+def udp_receive(sock: socket.socket, decode=True, timeout: float | None = None) -> tuple[str | bytes | None, Address | None]:
+    if timeout is not None:
+        ready, ignore1, ignore2 = select.select([sock], [], [], timeout)
+        if not ready:
+            return None, None
     payload, address = sock.recvfrom(THRESHOLD_DGRAM_SIZE)
     address = Address(*address)
     logger.debug(f"Received {len(payload)} bytes from {address}: {payload!r}")
@@ -67,14 +73,14 @@ class UdpSession(Session):
     def send(self, payload: bytes | str):
         return udp_send(self._socket, self.remote_address, payload)
 
-    def receive(self, decode=True):
+    def receive(self, decode=True, timeout: float | None = None) -> str | bytes | None:
         if self._first_message is not None:
             payload = self._first_message
             if decode and isinstance(payload, bytes):
                 payload = payload.decode()
             self._first_message = None
             return payload
-        payload, address = udp_receive(self._socket, decode)
+        payload, address = udp_receive(self._socket, decode, timeout)
         if address is not None:
             if self._received_messages == 0:
                 self._remote_address = address
@@ -110,8 +116,8 @@ class UdpServer(Server):
             first_message=payload
         )
 
-    def receive(self, decode=True) -> tuple[str | bytes | None, Address | None]:
-        return udp_receive(self._socket, decode)
+    def receive(self, decode=True, timeout: float | None= None) -> tuple[str | bytes | None, Address | None]:
+        return udp_receive(self._socket, decode, timeout)
 
     def send(self, address: Address, payload: bytes | str):
         return udp_send(self._socket, address, payload)
