@@ -75,7 +75,7 @@ class ActionMap:
     name: str = 'custom'
 
     def to_key_map(self):
-        return {getattr(self, name): PlayerAction[name.upper()] for name in self.__annotations__ if name != 'name'}
+        return {getattr(self, name): PlayerAction[name.upper()] for name in type(self).__annotations__ if name != 'name'}
 
     @classmethod
     def wasd(cls):
